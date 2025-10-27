@@ -152,10 +152,10 @@ async def send_random_message():
             del currentMessageToSend["song"]
 
     # Планируем следующее случайное время отправки
-    schedule_random_message(currentMessageToSend["ID"])
+    await schedule_random_message(currentMessageToSend["ID"])
 
 
-def schedule_random_message(ID):
+async def schedule_random_message(ID):
     """Планирует отправку в случайную дату/время"""
     scheduler.remove_all_jobs()  # очищаем прошлое задание
  
@@ -196,7 +196,7 @@ def schedule_random_message(ID):
 async def start_cmd(message: types.Message):
     scheduler.start()
     await message.answer("ну что ж, если ты это читаешь, саш, то я влип в долги.\nебаный белбет, теперь должен родине...\nно часть моего разума осталась здесь и она с тобой!\nпериодически будет тебе напоминать об одной твари, которая дрочит письки в армии.\nнаслаждайся😈")
-    schedule_random_message(int(message.from_user.id))
+    await schedule_random_message(int(message.from_user.id))
 
     
 
