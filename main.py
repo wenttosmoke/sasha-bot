@@ -145,7 +145,7 @@ def schedule_random_message():
     if random.choice(sendToSasha[message]["withPhoto"]) == 1:
         print(f"Сообщение будет отправлено с фото.")   
         currentMessageToSend["photo"] = random.choice(sendToSasha[message]["photos"])
-        del sendToSasha[message]["photos"][currentMessageToSend["photo"]]
+        sendToSasha[message]["photos"].remove(currentMessageToSend["photo"])
     if random.choice(sendToSasha[message]["withSticker"]) == 1:
         print(f"Сообщение будет отправлено со стикером.")
         currentMessageToSend["sticker"] = random.choice(sendToSasha[message]["stickers"])
