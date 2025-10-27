@@ -86,6 +86,18 @@ sendToSasha = {
             "CAACAgIAAxkBAANGaP4z4mQnL4L45XJwwo_o8FBJRkAAAnkUAAJlUxhIRJoGxi3KttA2BA",
             "CAACAgIAAxkBAANIaP4z7D4SnQrjdzolEQZdnDOMjrAAAu4QAAI0RaBL0kA3lxJ96pg2BA"
         ]
+    },
+    "withSong": {
+        "texts": [
+            "сегодня эта песня напоминает о тебе",
+            "тёмный принц СКОКА СКОКА СКОКА"
+        ],
+        "songs": [
+            "songs/1.mp3",
+            "songs/2.mp3",
+            "songs/3.mp3",
+            "songs/4.mp3"
+        ]
     }
 }
 currentMessageToSend = {}
@@ -111,17 +123,21 @@ async def keep_alive():
 # === Функция случайной рассылки ===
 async def send_random_message():
     try:
-        if "photo" in currentMessageToSend:
-            await bot.send_photo(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
-            await bot.send_photo(GROUP_ID, FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
-            del currentMessageToSend["photo"]
+        if "song" in currentMessageToSend:
+            await bot.send_audio(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["song"]), caption=currentMessageToSend["text"])
+            del currentMessageToSend["song"]
         else:
-            await bot.send_message(currentMessageToSend["ID"], text=currentMessageToSend["text"])
-            await bot.send_message(GROUP_ID, text=currentMessageToSend["text"])
-        if "sticker" in currentMessageToSend:
-            await bot.send_sticker(currentMessageToSend["ID"], sticker=currentMessageToSend["sticker"])
-            await bot.send_sticker(GROUP_ID, sticker=currentMessageToSend["sticker"])
-            del currentMessageToSend["sticker"]
+            if "photo" in currentMessageToSend:
+                await bot.send_photo(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
+                await bot.send_photo(GROUP_ID, FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
+                del currentMessageToSend["photo"]
+            else:
+                await bot.send_message(currentMessageToSend["ID"], text=currentMessageToSend["text"])
+                await bot.send_message(GROUP_ID, text=currentMessageToSend["text"])
+            if "sticker" in currentMessageToSend:
+                await bot.send_sticker(currentMessageToSend["ID"], sticker=currentMessageToSend["sticker"])
+                await bot.send_sticker(GROUP_ID, sticker=currentMessageToSend["sticker"])
+                del currentMessageToSend["sticker"]
         del currentMessageToSend["text"]
         print(f"[{datetime.now()}] Сообщение отправлено.")
     except Exception as e:
@@ -132,7 +148,8 @@ async def send_random_message():
             del currentMessageToSend["text"]
         if "photo" in currentMessageToSend:
             del currentMessageToSend["photo"]
-        
+        if "song" in currentMessageToSend:
+            del currentMessageToSend["song"]
 
     # Планируем следующее случайное время отправки
     schedule_random_message(currentMessageToSend["ID"])
@@ -156,13 +173,18 @@ def schedule_random_message(ID):
     message = random.choice(list(sendToSasha.keys()))
     text = random.choice(sendToSasha[message]["texts"])
     sendToSasha[message]["texts"].remove(text)
-    if random.choice(sendToSasha[message]["withPhoto"]) == 1:
-        print(f"Сообщение будет отправлено с фото.")   
-        currentMessageToSend["photo"] = random.choice(sendToSasha[message]["photos"])
-        sendToSasha[message]["photos"].remove(currentMessageToSend["photo"])
-    if random.choice(sendToSasha[message]["withSticker"]) == 1:
-        print(f"Сообщение будет отправлено со стикером.")
-        currentMessageToSend["sticker"] = random.choice(sendToSasha[message]["stickers"])
+    if message == "withSong":
+        print(f"Сообщение будет отправлено с песней.")
+        currentMessageToSend["song"] = random.choice(sendToSasha[message]["songs"])
+        sendToSasha[message]["songs"].remove(currentMessageToSend["song"])
+    else:
+        if random.choice(sendToSasha[message]["withPhoto"]) == 1:
+            print(f"Сообщение будет отправлено с фото.")   
+            currentMessageToSend["photo"] = random.choice(sendToSasha[message]["photos"])
+            sendToSasha[message]["photos"].remove(currentMessageToSend["photo"])
+        if random.choice(sendToSasha[message]["withSticker"]) == 1:
+            print(f"Сообщение будет отправлено со стикером.")
+            currentMessageToSend["sticker"] = random.choice(sendToSasha[message]["stickers"])
     currentMessageToSend["text"] = text
     currentMessageToSend["ID"] = ID
     scheduler.add_job(send_random_message, "date", run_date=run_time)
