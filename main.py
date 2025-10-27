@@ -131,8 +131,8 @@ def schedule_random_message():
     # Случайное время — от 1 часа до 2 дней вперёд
     delta = timedelta(
         days=0,
-        hours=0,
-        minutes=1
+        hours=1,
+        minutes=0
         # days=random.randint(0, 7),
         # hours=random.randint(0, 23),
         # minutes=random.randint(0, 59)
@@ -145,7 +145,7 @@ def schedule_random_message():
     if random.choice(sendToSasha[message]["withPhoto"]) == 1:
         print(f"Сообщение будет отправлено с фото.")   
         currentMessageToSend["photo"] = random.choice(sendToSasha[message]["photos"])
-        del sendToSasha[message]["photos"][currentMessageToSend["photo"]]
+        sendToSasha[message]["photos"].remove(currentMessageToSend["photo"])
     if random.choice(sendToSasha[message]["withSticker"]) == 1:
         print(f"Сообщение будет отправлено со стикером.")
         currentMessageToSend["sticker"] = random.choice(sendToSasha[message]["stickers"])
