@@ -106,19 +106,19 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 scheduler = AsyncIOScheduler()
 
-async def keep_alive():
-    """Периодически пингует сайт, чтобы Render не выключал приложение"""
-    while True:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(WEBHOOK_HOST) as response:
-                    if response.status == 200:
-                        print(f"[{datetime.now()}] 🔁 Пинг успешен.")
-                    else:
-                        print(f"[{datetime.now()}] ⚠️ Пинг неудачен: {response.status}")
-        except Exception as e:
-            print(f"[{datetime.now()}] Ошибка при пинге: {e}")
-        await asyncio.sleep(240)  # каждые 4 минуты
+# async def keep_alive():
+#     """Периодически пингует сайт, чтобы Render не выключал приложение"""
+#     while True:
+#         try:
+#             async with aiohttp.ClientSession() as session:
+#                 async with session.get(WEBHOOK_HOST) as response:
+#                     if response.status == 200:
+#                         print(f"[{datetime.now()}] 🔁 Пинг успешен.")
+#                     else:
+#                         print(f"[{datetime.now()}] ⚠️ Пинг неудачен: {response.status}")
+#         except Exception as e:
+#             print(f"[{datetime.now()}] Ошибка при пинге: {e}")
+#         await asyncio.sleep(240)  # каждые 4 минуты
 
 # === Функция случайной рассылки ===
 async def send_random_message():
@@ -139,9 +139,9 @@ async def send_random_message():
                 await bot.send_sticker(GROUP_ID, sticker=currentMessageToSend["sticker"])
                 del currentMessageToSend["sticker"]
         del currentMessageToSend["text"]
-        print(f"[{datetime.now()}] Сообщение отправлено.")
+        print(f"[{datetime.now()}] Сообщение отправлено.", flush=True)
     except Exception as e:
-        print(f"Ошибка при отправке: {e}")
+        print(f"Ошибка при отправке: {e}", flush=True)
         if "sticker" in currentMessageToSend:
             del currentMessageToSend["sticker"]
         if "text" in currentMessageToSend:
@@ -174,21 +174,21 @@ async def schedule_random_message(ID):
     text = random.choice(sendToSasha[message]["texts"])
     sendToSasha[message]["texts"].remove(text)
     if message == "withSong":
-        print(f"Сообщение будет отправлено с песней.")
+        print(f"Сообщение будет отправлено с песней.", flush=True)
         currentMessageToSend["song"] = random.choice(sendToSasha[message]["songs"])
         sendToSasha[message]["songs"].remove(currentMessageToSend["song"])
     else:
         if random.choice(sendToSasha[message]["withPhoto"]) == 1:
-            print(f"Сообщение будет отправлено с фото.")   
+            print(f"Сообщение будет отправлено с фото.", flush=True)   
             currentMessageToSend["photo"] = random.choice(sendToSasha[message]["photos"])
             sendToSasha[message]["photos"].remove(currentMessageToSend["photo"])
         if random.choice(sendToSasha[message]["withSticker"]) == 1:
-            print(f"Сообщение будет отправлено со стикером.")
+            print(f"Сообщение будет отправлено со стикером.", flush=True)
             currentMessageToSend["sticker"] = random.choice(sendToSasha[message]["stickers"])
     currentMessageToSend["text"] = text
     currentMessageToSend["ID"] = ID
     scheduler.add_job(send_random_message, "date", run_date=run_time)
-    print(f"Следующее сообщение запланировано на {run_time}")
+    print(f"Следующее сообщение запланировано на {run_time}", flush=True)
 
 
 # === Обработчики команд и сообщений ===
@@ -223,7 +223,7 @@ async def run_http_server(port: int):
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    print(f"HTTP server started on 0.0.0.0:{port}")
+    print(f"HTTP server started on 0.0.0.0:{port}", flush=True)
 
 
 # === Основной запуск ===
@@ -240,7 +240,7 @@ async def main():
     # 4) запускаем polling (aiogram)
     # Удаляем webhook на всякий случай, чтобы не конфликтовал
     await bot.delete_webhook(drop_pending_updates=True)
-    print("🚀 Start polling...")
+    print("🚀 Start polling...", flush=True)
     await dp.start_polling(bot)
 
 
