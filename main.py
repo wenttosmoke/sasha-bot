@@ -2,7 +2,9 @@ import asyncio
 import os
 import random
 from datetime import datetime, timedelta
+
 import aiohttp
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import FSInputFile
@@ -185,12 +187,37 @@ async def echo_msg(message: types.Message):
 
 
 # === Основной запуск ===
+async def run_http_server(port: int):
+    async def handle_root(request):
+        return web.Response(text="✅ OK")
+
+    app = web.Application()
+    app.add_routes([web.get("/", handle_root)])
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    print(f"HTTP server started on 0.0.0.0:{port}")
+
+
+# === Основной запуск ===
 async def main():
+    # 1) запускаем планировщик
     scheduler.start()
-    asyncio.create_task(keep_alive())
+
+    # 2) запускаем локальный HTTP-сервер на PORT (чтобы Render увидел открытый порт)
+    port = int(os.getenv("PORT", "8080"))
+    await run_http_server(port)
+
+    # 3) (опционально) можно запустить keep-alive пинг, но не обязателен, т.к. порт открыт
+    # asyncio.create_task(keep_alive())  # если хочешь пинги к WEBHOOK_HOST
+
+    # 4) запускаем polling (aiogram)
+    # Удаляем webhook на всякий случай, чтобы не конфликтовал
     await bot.delete_webhook(drop_pending_updates=True)
-    print("🚀 Бот запущен (polling)...")
+    print("🚀 Start polling...")
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
