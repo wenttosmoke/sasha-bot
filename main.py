@@ -1,5 +1,6 @@
 import asyncio
 import random
+import os
 from datetime import datetime, timedelta
 
 from aiogram import Bot, Dispatcher, types
@@ -10,9 +11,9 @@ from aiohttp import web
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 # === Настройки ===
-API_TOKEN = "8401693264:AAEz21vSR2t5fq7UJZifgfL7s4ZE1ZZrZ7g"
-USER_ID = 814673209  # ID пользователя, которому бот будет отправлять сообщения
-GROUP_ID = -4885701691
+API_TOKEN = os.getenv("API_TOKEN")
+USER_ID = int(os.getenv("USER_ID")) # ID пользователя, которому бот будет отправлять сообщения
+GROUP_ID = int(os.getenv("GROUP_ID"))
 
 WEBHOOK_HOST = "https://vladickbot.ру"  # 🌐 Укажи свой домен (https обязательно!)
 WEBHOOK_PATH = "/webhook"
