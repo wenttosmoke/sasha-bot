@@ -181,14 +181,37 @@ async def echo_msg(message: types.Message):
 
 
 # === Основной запуск ===
-def run_bot():
-    async def _main():
-         scheduler.start()
-         await bot.delete_webhook(drop_pending_updates=True)
-         await dp.start_polling(bot)
-    asyncio.run(_main())
+async def on_startup(app):
+    scheduler.start()
+    await bot.delete_webhook(drop_pending_updates=True)
+    await bot.set_webhook(WEBHOOK_URL)
+    print(f"✅ Webhook установлен: {WEBHOOK_URL}")
 
-if __name__ == "__main__": # Запускаем Telegram-бота в фоне
-    threading.Thread(target=run_bot, daemon=True).start()
-    # Запускаем Flask-сайт
-    app.run(host="0.0.0.0", port=8080)
+
+async def on_shutdown(app):
+    await bot.session.close()
+    scheduler.shutdown(wait=False)
+    print("🛑 Бот выключен.")
+
+
+def setup_routes(app):
+    async def index(request):
+        return web.Response(text="✅ Сайт и бот работают!")
+
+    app.router.add_get("/", index)
+    from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+    setup_application(app, dp, bot)
+
+
+# ------------------------- запуск -------------------------
+def main():
+    app = web.Application()
+    setup_routes(app)
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
+    web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
+
+
+if __name__ == "__main__":
+    main()
