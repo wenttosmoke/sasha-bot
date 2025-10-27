@@ -12,7 +12,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # === Настройки ===
 API_TOKEN = os.getenv("API_TOKEN")
-USER_ID = int(os.getenv("USER_ID")) # ID пользователя, которому бот будет отправлять сообщения
 GROUP_ID = int(os.getenv("GROUP_ID"))
 
 WEBHOOK_HOST = "https://sasha-bot-lwjs.onrender.com"  # 🌐 Укажи свой домен (https обязательно!)
@@ -113,14 +112,14 @@ async def keep_alive():
 async def send_random_message():
     try:
         if "photo" in currentMessageToSend:
-            await bot.send_photo(USER_ID, FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
+            await bot.send_photo(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
             await bot.send_photo(GROUP_ID, FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
             del currentMessageToSend["photo"]
         else:
-            await bot.send_message(USER_ID, text=currentMessageToSend["text"])
+            await bot.send_message(currentMessageToSend["ID"], text=currentMessageToSend["text"])
             await bot.send_message(GROUP_ID, text=currentMessageToSend["text"])
         if "sticker" in currentMessageToSend:
-            await bot.send_sticker(USER_ID, sticker=currentMessageToSend["sticker"])
+            await bot.send_sticker(currentMessageToSend["ID"], sticker=currentMessageToSend["sticker"])
             await bot.send_sticker(GROUP_ID, sticker=currentMessageToSend["sticker"])
             del currentMessageToSend["sticker"]
         del currentMessageToSend["text"]
@@ -133,12 +132,13 @@ async def send_random_message():
             del currentMessageToSend["text"]
         if "photo" in currentMessageToSend:
             del currentMessageToSend["photo"]
+        
 
     # Планируем следующее случайное время отправки
-    schedule_random_message()
+    schedule_random_message(currentMessageToSend["ID"])
 
 
-def schedule_random_message():
+def schedule_random_message(ID):
     """Планирует отправку в случайную дату/время"""
     scheduler.remove_all_jobs()  # очищаем прошлое задание
  
@@ -146,7 +146,7 @@ def schedule_random_message():
     delta = timedelta(
         days=0,
         hours=0,
-        minutes=20
+        minutes=16
         # days=random.randint(0, 7),
         # hours=random.randint(0, 23),
         # minutes=random.randint(0, 59)
@@ -164,6 +164,7 @@ def schedule_random_message():
         print(f"Сообщение будет отправлено со стикером.")
         currentMessageToSend["sticker"] = random.choice(sendToSasha[message]["stickers"])
     currentMessageToSend["text"] = text
+    currentMessageToSend["ID"] = ID
     scheduler.add_job(send_random_message, "date", run_date=run_time)
     print(f"Следующее сообщение запланировано на {run_time}")
 
@@ -172,7 +173,8 @@ def schedule_random_message():
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
     await message.answer("ну что ж, если ты это читаешь, саш, то я влип в долги.\nебаный белбет, теперь должен родине...\nно часть моего разума осталась здесь и она с тобой!\nпериодически будет тебе напоминать об одной твари, которая дрочит письки в армии.\nнаслаждайся😈")
-    schedule_random_message()
+    schedule_random_message(int(message.from_user.id))
+    
 
 
 @dp.message()
