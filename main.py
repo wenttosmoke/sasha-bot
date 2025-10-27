@@ -201,7 +201,7 @@ def setup_routes(app):
     app.router.add_get("/", index)
     from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
-    setup_application(app, dp, bot)
+    setup_application(app, dp)
 
 
 # ------------------------- запуск -------------------------
