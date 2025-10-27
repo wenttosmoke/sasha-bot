@@ -2,13 +2,11 @@ import asyncio
 import os
 import random
 from datetime import datetime, timedelta
-
+import aiohttp
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import FSInputFile
-from aiohttp import web
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 # === Настройки ===
 API_TOKEN = os.getenv("API_TOKEN")
@@ -95,6 +93,20 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 scheduler = AsyncIOScheduler()
 
+async def keep_alive():
+    """Периодически пингует сайт, чтобы Render не выключал приложение"""
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(WEBHOOK_HOST) as response:
+                    if response.status == 200:
+                        print(f"[{datetime.now()}] 🔁 Пинг успешен.")
+                    else:
+                        print(f"[{datetime.now()}] ⚠️ Пинг неудачен: {response.status}")
+        except Exception as e:
+            print(f"[{datetime.now()}] Ошибка при пинге: {e}")
+        await asyncio.sleep(240)  # каждые 4 минуты
+
 # === Функция случайной рассылки ===
 async def send_random_message():
     try:
@@ -173,30 +185,12 @@ async def echo_msg(message: types.Message):
 
 
 # === Основной запуск ===
-async def on_startup(app):
+async def main():
     scheduler.start()
+    asyncio.create_task(keep_alive())
     await bot.delete_webhook(drop_pending_updates=True)
-    await bot.set_webhook(WEBHOOK_URL)
-    print(f"✅ Webhook установлен: {WEBHOOK_URL}")
-
-async def on_shutdown(app):
-    await bot.session.close()
-    scheduler.shutdown(wait=False)
-    print("🛑 Бот выключен.")
-
-def setup_routes(app):
-    async def index(request):
-        return web.Response(text="✅ Сайт и бот работают!")
-    app.router.add_get("/", index)
-    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
-    setup_application(app, dp)
-
-def main():
-    app = web.Application()
-    setup_routes(app)
-    app.on_startup.append(on_startup)
-    app.on_shutdown.append(on_shutdown)
-    web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
+    print("🚀 Бот запущен (polling)...")
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
