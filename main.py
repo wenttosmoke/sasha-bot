@@ -143,8 +143,8 @@ def schedule_random_message():
     # Случайное время — от 1 часа до 2 дней вперёд
     delta = timedelta(
         days=0,
-        hours=1,
-        minutes=0
+        hours=0,
+        minutes=20
         # days=random.randint(0, 7),
         # hours=random.randint(0, 23),
         # minutes=random.randint(0, 59)
