@@ -1,16 +1,14 @@
 import asyncio
-import random
 import os
-import threading
-
+import random
 from datetime import datetime, timedelta
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import FSInputFile
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from aiohttp import web
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
-from flask import Flask
 
 # === Настройки ===
 API_TOKEN = os.getenv("API_TOKEN")
@@ -187,31 +185,24 @@ async def on_startup(app):
     await bot.set_webhook(WEBHOOK_URL)
     print(f"✅ Webhook установлен: {WEBHOOK_URL}")
 
-
 async def on_shutdown(app):
     await bot.session.close()
     scheduler.shutdown(wait=False)
     print("🛑 Бот выключен.")
 
-
 def setup_routes(app):
     async def index(request):
         return web.Response(text="✅ Сайт и бот работают!")
-
     app.router.add_get("/", index)
-    from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp)
 
-
-# ------------------------- запуск -------------------------
 def main():
     app = web.Application()
     setup_routes(app)
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
     web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
-
 
 if __name__ == "__main__":
     main()
