@@ -15,7 +15,7 @@ API_TOKEN = os.getenv("API_TOKEN")
 USER_ID = int(os.getenv("USER_ID")) # ID пользователя, которому бот будет отправлять сообщения
 GROUP_ID = int(os.getenv("GROUP_ID"))
 
-WEBHOOK_HOST = "https://vladickbot.ру"  # 🌐 Укажи свой домен (https обязательно!)
+WEBHOOK_HOST = "https://sasha-bot-lwjs.onrender.com"  # 🌐 Укажи свой домен (https обязательно!)
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
