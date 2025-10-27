@@ -19,12 +19,6 @@ WEBHOOK_HOST = "https://sasha-bot-lwjs.onrender.com"  # 🌐 Укажи свой
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "✅ Сайт и бот работают!"
-
 # === Объекты с данными ===
 sendToSasha = {
 
