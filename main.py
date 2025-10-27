@@ -141,7 +141,7 @@ def schedule_random_message():
     run_time = datetime.now() + delta
     message = random.choice(list(sendToSasha.keys()))
     text = random.choice(sendToSasha[message]["texts"])
-    del sendToSasha[message]["texts"][text]
+    sendToSasha[message]["texts"].remove(text)
     if random.choice(sendToSasha[message]["withPhoto"]) == 1:
         print(f"Сообщение будет отправлено с фото.")   
         currentMessageToSend["photo"] = random.choice(sendToSasha[message]["photos"])
