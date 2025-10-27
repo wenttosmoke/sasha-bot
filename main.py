@@ -1,14 +1,16 @@
 import asyncio
 import random
 import os
-from datetime import datetime, timedelta
+import threading
 
+from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import FSInputFile
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from aiohttp import web
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from flask import Flask
 
 # === Настройки ===
 API_TOKEN = os.getenv("API_TOKEN")
@@ -18,6 +20,12 @@ GROUP_ID = int(os.getenv("GROUP_ID"))
 WEBHOOK_HOST = "https://sasha-bot-lwjs.onrender.com"  # 🌐 Укажи свой домен (https обязательно!)
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "✅ Сайт и бот работают!"
 
 # === Объекты с данными ===
 sendToSasha = {
@@ -113,6 +121,12 @@ async def send_random_message():
         print(f"[{datetime.now()}] Сообщение отправлено.")
     except Exception as e:
         print(f"Ошибка при отправке: {e}")
+        if "sticker" in currentMessageToSend:
+            del currentMessageToSend["sticker"]
+        if "text" in currentMessageToSend:
+            del currentMessageToSend["text"]
+        if "photo" in currentMessageToSend:
+            del currentMessageToSend["photo"]
 
     # Планируем следующее случайное время отправки
     schedule_random_message()
@@ -125,8 +139,8 @@ def schedule_random_message():
     # Случайное время — от 1 часа до 2 дней вперёд
     delta = timedelta(
         days=0,
-        hours=1,
-        minutes=0
+        hours=0,
+        minutes=1
         # days=random.randint(0, 7),
         # hours=random.randint(0, 23),
         # minutes=random.randint(0, 59)
@@ -167,29 +181,14 @@ async def echo_msg(message: types.Message):
 
 
 # === Основной запуск ===
-async def on_startup(app):
-    scheduler.start()
-    await bot.set_webhook(WEBHOOK_URL)
-    print(f"✅ Webhook установлен: {WEBHOOK_URL}")
+def run_bot():
+    async def _main():
+         scheduler.start()
+         await bot.delete_webhook(drop_pending_updates=True)
+         await dp.start_polling(bot)
+    asyncio.run(_main())
 
-async def on_shutdown(app):
-    await bot.delete_webhook()
-    await bot.session.close()
-    print("🛑 Бот выключен.")
-
-async def handle_root(request):
-    return web.Response(text="✅ Бот и вебхуки работают!")
-
-# === Настройка aiohttp ===
-app = web.Application()
-app.router.add_get("/", handle_root)
-
-# Здесь — современный способ подключения webhook handler
-SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
-setup_application(app, dp, bot=bot)
-
-app.on_startup.append(on_startup)
-app.on_shutdown.append(on_shutdown)
-
-if __name__ == "__main__":
-    web.run_app(app, host="0.0.0.0", port=8000)
+if __name__ == "__main__": # Запускаем Telegram-бота в фоне
+    threading.Thread(target=run_bot, daemon=True).start()
+    # Запускаем Flask-сайт
+    app.run(host="0.0.0.0", port=8080)
