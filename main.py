@@ -204,7 +204,7 @@ async def schedule_random_message(ID):
             currentMessageToSend["sticker"] = random.choice(sendToSasha[message]["stickers"])
     currentMessageToSend["text"] = text
     currentMessageToSend["ID"] = ID
-    await bot.send_message(LOGS_ID, text=f"❕❕❕\t\tСледующее сообщение:\t\t❕❕❕\nТекст: ${currentMessageToSend["text"]}\nФото: ${currentMessageToSend["photo"] if "photo" in currentMessageToSend else ""}\nСтикер: ${currentMessageToSend["sticker"] if "" in currentMessageToSend else ""}\nПесня: ${currentMessageToSend["song"] if "song" in currentMessageToSend else ""}")
+    await bot.send_message(LOGS_ID, text=f"❕❕❕\t\tСледующее сообщение:\t\t❕❕❕\nТекст: {currentMessageToSend["text"]}\nФото: {currentMessageToSend["photo"] if "photo" in currentMessageToSend else ""}\nСтикер: {currentMessageToSend["sticker"] if "" in currentMessageToSend else ""}\nПесня: {currentMessageToSend["song"] if "song" in currentMessageToSend else ""}")
     scheduler.add_job(send_random_message, "date", run_date=run_time)
     print(f"❕ Следующее сообщение успешно запланировано на {run_time} ❕", flush=True)
     await bot.send_message(LOGS_ID, text=f"❕ Следующее сообщение успешно запланировано на {run_time} ❕")
@@ -215,7 +215,7 @@ async def schedule_random_message(ID):
 async def start_cmd(message: types.Message):
     scheduler.start()
     await message.answer("ну что ж, если ты это читаешь, саш, то я влип в долги.\nебаный белбет, теперь должен родине...\nно часть моего разума осталась здесь и она с тобой!\nпериодически будет тебе напоминать об одной твари, которая дрочит письки в армии.\nнаслаждайся😈")
-    await bot.send_message(LOGS_ID, text=f"Пользователь с ID ${message.from_user.id} запустил бота")
+    await bot.send_message(LOGS_ID, text=f"Пользователь с ID {message.from_user.id} запустил бота")
     await schedule_random_message(int(message.from_user.id))
 
     
