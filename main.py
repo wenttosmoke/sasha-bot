@@ -280,7 +280,6 @@ async def echo_msg(message: types.Message):
             from_chat_id=message.chat.id,  
             message_id=message.message_id
         )
-pytz.aste
 
 # === Основной запуск ===
 async def run_http_server(port: int):
