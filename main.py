@@ -15,7 +15,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 API_TOKEN = os.getenv("API_TOKEN")
 GROUP_ID = int(os.getenv("GROUP_ID"))
 LOGS_ID = int(os.getenv("LOGS_ID"))
-STATE_FILE = "json/state.json"
+STATE_DIR ="json"
+STATE_FILE = os.path.join(STATE_DIR, "state.json")
 
 WEBHOOK_HOST = "https://sasha-bot-lwjs.onrender.com"  # 🌐 Укажи свой домен (https обязательно!)
 WEBHOOK_PATH = "/webhook"
@@ -116,6 +117,7 @@ scheduler = AsyncIOScheduler()
 # === Функции сохранения и загрузки рассылки из памяти ===
 async def save_state(data: dict):
     try:
+        os.makedirs(STATE_DIR, exist_ok=True)
         with open(STATE_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         await bot.send_message(LOGS_ID, text="❕Запланированное сообщение успешно сохранено в память❕")
