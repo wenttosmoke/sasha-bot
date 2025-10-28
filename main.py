@@ -1,8 +1,9 @@
 import asyncio
 import os
 import random
-from datetime import datetime, timedelta
+import pytz
 
+from datetime import datetime, timedelta
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
@@ -149,15 +150,15 @@ async def send_random_message():
         await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке стикера: {e} ⚠️")
             
     if is_sent == len(currentMessageToSend.keys()):
-        print(f"✅ [{datetime.now()}] Сообщение успешно отправлено ✅", flush=True)
-        await bot.send_message(LOGS_ID, text=f"✅ [{datetime.now()}] Сообщение успешно отправлено ✅")
+        print(f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение успешно отправлено ✅", flush=True)
+        await bot.send_message(LOGS_ID, text=f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение успешно отправлено ✅")
     else:
         if is_sent == 0:
-            print(f"❌❌❌ [{datetime.now()}] Сообщение не было отправлено ❌❌❌", flush=True)
+            print(f"❌❌❌ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение не было отправлено ❌❌❌", flush=True)
             await bot.send_message(LOGS_ID, text=f"❌❌❌ [{datetime.now()}] Сообщение не было отправлено ❌❌❌")
         else:
-            print(f"✅⚠️ [{datetime.now()}] Сообщение было отправлено с ошибкой ✅⚠️", flush=True)
-            await bot.send_message(LOGS_ID, text=f"✅⚠️ [{datetime.now()}] Сообщение было отправлено с ошибкой ✅⚠️")
+            print(f"✅⚠️ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение было отправлено с ошибкой ✅⚠️", flush=True)
+            await bot.send_message(LOGS_ID, text=f"✅⚠️ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение было отправлено с ошибкой ✅⚠️")
 
     if "song" in currentMessageToSend:
         del currentMessageToSend["song"]        
@@ -186,7 +187,7 @@ async def schedule_random_message(ID):
         # minutes=random.randint(0, 59)
     )
     
-    run_time = datetime.now() + delta
+    run_time = datetime.now(pytz.timezone("Europe/Moscow")) + delta
     message = random.choice(list(sendToSasha.keys()))
     text = random.choice(sendToSasha[message]["texts"])
     sendToSasha[message]["texts"].remove(text)
