@@ -302,7 +302,7 @@ async def main():
     await run_http_server(port)
 
     # 2) проверяем наличие сообщений в очереди
-    state = load_state()
+    state = await load_state()
     if state and "next_message_time" in state:
         try:
             run_time = datetime.fromisoformat(state["next_message_time"])
