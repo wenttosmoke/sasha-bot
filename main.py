@@ -129,7 +129,7 @@ async def load_state() -> dict:
         if os.path.exists(STATE_FILE):
             with open(STATE_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        await bot.send_message(LOGS_ID, text="❕Запланированное сообщение успешно загружено из памяти❕")
+            await bot.send_message(LOGS_ID, text="❕Запланированное сообщение успешно загружено из памяти❕")
     except Exception as e:
         print(f"⚠️ Ошибка при загрузке запланированного сообщения из памяти: {e}", flush=True)
         await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при загрузке запланированного сообщения из памяти: {e}")
