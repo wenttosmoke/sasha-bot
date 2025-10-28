@@ -3,7 +3,6 @@ import os
 import random
 from datetime import datetime, timedelta
 
-import aiohttp
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
@@ -13,6 +12,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 # === Настройки ===
 API_TOKEN = os.getenv("API_TOKEN")
 GROUP_ID = int(os.getenv("GROUP_ID"))
+LOGS_ID = int(os.getenv("LOGS_ID"))
 
 WEBHOOK_HOST = "https://sasha-bot-lwjs.onrender.com"  # 🌐 Укажи свой домен (https обязательно!)
 WEBHOOK_PATH = "/webhook"
@@ -106,51 +106,68 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 scheduler = AsyncIOScheduler()
 
-# async def keep_alive():
-#     """Периодически пингует сайт, чтобы Render не выключал приложение"""
-#     while True:
-#         try:
-#             async with aiohttp.ClientSession() as session:
-#                 async with session.get(WEBHOOK_HOST) as response:
-#                     if response.status == 200:
-#                         print(f"[{datetime.now()}] 🔁 Пинг успешен.")
-#                     else:
-#                         print(f"[{datetime.now()}] ⚠️ Пинг неудачен: {response.status}")
-#         except Exception as e:
-#             print(f"[{datetime.now()}] Ошибка при пинге: {e}")
-#         await asyncio.sleep(240)  # каждые 4 минуты
 
 # === Функция случайной рассылки ===
 async def send_random_message():
+    is_sent = 0
     try:
         if "song" in currentMessageToSend:
             await bot.send_audio(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["song"]), caption=currentMessageToSend["text"])
+            await bot.send_audio(GROUP_ID, FSInputFile(currentMessageToSend["song"]), caption=currentMessageToSend["text"])
+            del currentMessageToSend["text"]
             del currentMessageToSend["song"]
-        else:
-            if "photo" in currentMessageToSend:
+            is_sent += 1
+    except Exception as e:
+        await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке песни с текстом: {e} ⚠️")
+
+    try:
+        if "photo" in currentMessageToSend:
                 await bot.send_photo(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
                 await bot.send_photo(GROUP_ID, FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
+                del currentMessageToSend["text"]
                 del currentMessageToSend["photo"]
-            else:
+                is_sent += 1
+    except Exception as e:
+        await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке фото с текстом: {e} ⚠️")
+
+    try:    
+        if "text" in currentMessageToSend:
                 await bot.send_message(currentMessageToSend["ID"], text=currentMessageToSend["text"])
                 await bot.send_message(GROUP_ID, text=currentMessageToSend["text"])
-            if "sticker" in currentMessageToSend:
+                del currentMessageToSend["text"]
+                is_sent += 1
+    except Exception as e:
+        await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке текста: {e} ⚠️")
+
+    try:        
+        if "sticker" in currentMessageToSend:
                 await bot.send_sticker(currentMessageToSend["ID"], sticker=currentMessageToSend["sticker"])
                 await bot.send_sticker(GROUP_ID, sticker=currentMessageToSend["sticker"])
                 del currentMessageToSend["sticker"]
-        del currentMessageToSend["text"]
-        print(f"[{datetime.now()}] Сообщение отправлено.", flush=True)
+                is_sent += 1
     except Exception as e:
-        print(f"Ошибка при отправке: {e}", flush=True)
-        if "sticker" in currentMessageToSend:
-            del currentMessageToSend["sticker"]
-        if "text" in currentMessageToSend:
-            del currentMessageToSend["text"]
-        if "photo" in currentMessageToSend:
-            del currentMessageToSend["photo"]
-        if "song" in currentMessageToSend:
-            del currentMessageToSend["song"]
+        await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке стикера: {e} ⚠️")
+            
+    if is_sent == len(currentMessageToSend.keys()):
+        print(f"✅ [{datetime.now()}] Сообщение успешно отправлено ✅", flush=True)
+        await bot.send_message(LOGS_ID, text=f"✅ [{datetime.now()}] Сообщение успешно отправлено ✅")
+    else:
+        if is_sent == 0:
+            print(f"❌❌❌ [{datetime.now()}] Сообщение не было отправлено ❌❌❌", flush=True)
+            await bot.send_message(LOGS_ID, text=f"❌❌❌ [{datetime.now()}] Сообщение не было отправлено ❌❌❌")
+        else:
+            print(f"✅⚠️ [{datetime.now()}] Сообщение было отправлено с ошибкой ✅⚠️", flush=True)
+            await bot.send_message(LOGS_ID, text=f"✅⚠️ [{datetime.now()}] Сообщение было отправлено с ошибкой ✅⚠️")
 
+    if "song" in currentMessageToSend:
+        del currentMessageToSend["song"]        
+    if "sticker" in currentMessageToSend:
+        del currentMessageToSend["sticker"]
+    if "text" in currentMessageToSend:
+        del currentMessageToSend["text"]
+    if "photo" in currentMessageToSend:
+        del currentMessageToSend["photo"]
+       
     # Планируем следующее случайное время отправки
     await schedule_random_message(currentMessageToSend["ID"])
 
@@ -187,8 +204,9 @@ async def schedule_random_message(ID):
             currentMessageToSend["sticker"] = random.choice(sendToSasha[message]["stickers"])
     currentMessageToSend["text"] = text
     currentMessageToSend["ID"] = ID
+    await bot.send_message(LOGS_ID, text=f"❕❕❕\t\tСледующее сообщение:\t\t❕❕❕\n${currentMessageToSend}")
     scheduler.add_job(send_random_message, "date", run_date=run_time)
-    print(f"Следующее сообщение запланировано на {run_time}", flush=True)
+    print(f"❕ Следующее сообщение успешно запланировано на {run_time} ❕", flush=True)
 
 
 # === Обработчики команд и сообщений ===
@@ -196,6 +214,7 @@ async def schedule_random_message(ID):
 async def start_cmd(message: types.Message):
     scheduler.start()
     await message.answer("ну что ж, если ты это читаешь, саш, то я влип в долги.\nебаный белбет, теперь должен родине...\nно часть моего разума осталась здесь и она с тобой!\nпериодически будет тебе напоминать об одной твари, которая дрочит письки в армии.\nнаслаждайся😈")
+    await bot.send_message(LOGS_ID, text=f"Пользователь с ID ${message.from_user.id} запустил бота")
     await schedule_random_message(int(message.from_user.id))
 
     
@@ -223,7 +242,8 @@ async def run_http_server(port: int):
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    print(f"HTTP server started on 0.0.0.0:{port}", flush=True)
+    print(f"❕ HTTP server started on 0.0.0.0:{port} ❕", flush=True)
+    await bot.send_message(LOGS_ID, text=f"❕ HTTP server started on 0.0.0.0:{port} ❕")
 
 
 # === Основной запуск ===
@@ -241,6 +261,7 @@ async def main():
     # Удаляем webhook на всякий случай, чтобы не конфликтовал
     await bot.delete_webhook(drop_pending_updates=True)
     print("🚀 Start polling...", flush=True)
+    await bot.send_message(LOGS_ID, text="🚀 Start polling...")
     await dp.start_polling(bot)
 
 
