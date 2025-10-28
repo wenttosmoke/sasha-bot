@@ -273,13 +273,14 @@ async def start_cmd(message: types.Message):
 async def echo_msg(message: types.Message):
     if message.chat.id == message.from_user.id:
         await message.reply("хых, я бы ответил, но я дрочу письки(\nпрости, солнце, я обязательно вернусь!\nнадеюсь у тебя всё хорошо")
-        await bot.send_message(GROUP_ID, text="❗❗❗ Она ответила " + str(message.date)[:-6] + " ❗❗❗")
+        message_date_utc = pytz.utc.localize(message.date)
+        await bot.send_message(GROUP_ID, text="❗❗❗ Она ответила " + str(message_date_utc.astimezone(pytz.timezone("Europe/Moscow")))[:-6] + " ❗❗❗")
         await bot.forward_message(
             chat_id=GROUP_ID,          
             from_chat_id=message.chat.id,  
             message_id=message.message_id
         )
-
+pytz.aste
 
 # === Основной запуск ===
 async def run_http_server(port: int):
