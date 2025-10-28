@@ -179,8 +179,8 @@ async def schedule_random_message(ID):
     # Случайное время — от 1 часа до 2 дней вперёд
     delta = timedelta(
         days=0,
-        hours=0,
-        minutes=16
+        hours=random.randint(0, 1),
+        minutes=random.randint(0, 59)
         # days=random.randint(0, 7),
         # hours=random.randint(0, 23),
         # minutes=random.randint(0, 59)
