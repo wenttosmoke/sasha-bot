@@ -140,6 +140,7 @@ async def load_state() -> dict:
 # === Функция случайной рассылки ===
 async def send_random_message():
     is_sent = 0
+    total_to_sent = len(currentMessageToSend.keys()) + 1
     try:
         if "song" in currentMessageToSend:
             await bot.send_audio(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["song"]), caption=currentMessageToSend["text"])
@@ -178,7 +179,7 @@ async def send_random_message():
     except Exception as e:
         await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке стикера: {e} ⚠️")
             
-    if is_sent == len(currentMessageToSend.keys()):
+    if is_sent == total_to_sent:
         print(f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение успешно отправлено ✅", flush=True)
         await bot.send_message(LOGS_ID, text=f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение успешно отправлено ✅")
         os.remove(STATE_FILE)
@@ -273,8 +274,7 @@ async def start_cmd(message: types.Message):
 async def echo_msg(message: types.Message):
     if message.chat.id == message.from_user.id:
         await message.reply("хых, я бы ответил, но я дрочу письки(\nпрости, солнце, я обязательно вернусь!\nнадеюсь у тебя всё хорошо")
-        message_date_utc = pytz.utc.localize(message.date)
-        await bot.send_message(GROUP_ID, text="❗❗❗ Она ответила " + str(message_date_utc.astimezone(pytz.timezone("Europe/Moscow")))[:-6] + " ❗❗❗")
+        await bot.send_message(GROUP_ID, text="❗❗❗ Она ответила ❗❗❗")
         await bot.forward_message(
             chat_id=GROUP_ID,          
             from_chat_id=message.chat.id,  
