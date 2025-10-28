@@ -248,7 +248,7 @@ async def schedule_random_message(ID):
     currentMessageToSend["ID"] = ID
     await bot.send_message(LOGS_ID, text=f"❕\tСледующее сообщение:\t❕\nТекст: {currentMessageToSend["text"]}\nФото: {currentMessageToSend["photo"] if "photo" in currentMessageToSend else ""}\nСтикер: {currentMessageToSend["sticker"] if "" in currentMessageToSend else ""}\nПесня: {currentMessageToSend["song"] if "song" in currentMessageToSend else ""}")
     scheduler.add_job(send_random_message, "date", run_date=run_time)
-    save_state({
+    await save_state({
         "next_message_time": run_time.isoformat(),
         "currentMessageToSend": currentMessageToSend
     })
