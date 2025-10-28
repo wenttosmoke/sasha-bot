@@ -224,13 +224,14 @@ async def start_cmd(message: types.Message):
 
 @dp.message()
 async def echo_msg(message: types.Message):
-    await message.reply("хых, я бы ответил, но я дрочу письки(\nпрости, солнце, я обязательно вернусь!\nнадеюсь у тебя всё хорошо")
-    await bot.send_message(GROUP_ID, text="❗❗❗ Она ответила " + str(message.date)[:-6] + " ❗❗❗")
-    await bot.forward_message(
-        chat_id=GROUP_ID,          
-        from_chat_id=message.chat.id,  
-        message_id=message.message_id
-    )
+    if message.chat.id == message.from_user.id:
+        await message.reply("хых, я бы ответил, но я дрочу письки(\nпрости, солнце, я обязательно вернусь!\nнадеюсь у тебя всё хорошо")
+        await bot.send_message(GROUP_ID, text="❗❗❗ Она ответила " + str(message.date)[:-6] + " ❗❗❗")
+        await bot.forward_message(
+            chat_id=GROUP_ID,          
+            from_chat_id=message.chat.id,  
+            message_id=message.message_id
+        )
 
 
 # === Основной запуск ===
