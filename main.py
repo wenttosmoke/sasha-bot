@@ -31,7 +31,8 @@ sendToSasha = {
             "если ты ещё не кушала, то быстро, вперёд. хорошее начало или завершение дня. не бери на себя много. ты большая умничка❤️",
             "ДА ПОЧЕМУ ТЫ ТАКОЙ КОТИК, АОАЦГАЦГАОЦАОЦГШ",
             "чаще в зеркало смотри, нужно же заполнять ежедневную норму увиденных котят",
-            "когда приеду, заобнимаю тебя, не убежишь!"
+            "когда приеду, заобнимаю тебя, не убежишь!",
+            "скучаю(..."
         ],
         "withPhoto":[0, 1],
         "photos": [
@@ -59,7 +60,8 @@ sendToSasha = {
             "отец цыганин очень часто видит своего сына в школе. просто сын учится в третьем классе, а отец в десятом...",
             "кунилинукс",
             "в душ? и без меня...",
-            "как впн для телевизора поставить?"
+            "как впн для телевизора поставить?",
+            "когда там...это самое"
         ],
         "withPhoto":[0, 1],
         "photos":[
@@ -162,7 +164,7 @@ async def send_random_message():
             await bot.send_audio(GROUP_ID, FSInputFile(currentMessageToSend["song"]), caption=currentMessageToSend["text"])
             del currentMessageToSend["text"]
             del currentMessageToSend["song"]
-            is_sent += 1
+            is_sent += 2
     except Exception as e:
         await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке песни с текстом: {e} ⚠️")
 
@@ -172,7 +174,7 @@ async def send_random_message():
                 await bot.send_photo(GROUP_ID, FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
                 del currentMessageToSend["text"]
                 del currentMessageToSend["photo"]
-                is_sent += 1
+                is_sent += 2
     except Exception as e:
         await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке фото с текстом: {e} ⚠️")
 
