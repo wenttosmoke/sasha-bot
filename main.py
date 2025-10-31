@@ -291,7 +291,7 @@ async def schedule_random_morning_message(ID):
     currentMorningToSend["ID"] = ID
     currentMorningToSend["sticker"] = choosedsticker
 
-    await bot.send_message(LOGS_ID, text=f"❕\tСледующее утреннее сообщение:\t❕\nТекст: {currentMorningToSend["text"]}\nСтикер: {currentMessageToSend["sticker"] if "" in currentMessageToSend else ""}")
+    await bot.send_message(LOGS_ID, text=f"❕\tСледующее утреннее сообщение:\t❕\nТекст: {currentMorningToSend["text"]}\nСтикер: {currentMorningToSend["sticker"] if "" in currentMorningToSend else ""}")
     scheduler.add_job(send_morning_message, "date", run_date=run_time_for_morning_texts, id="morning")
     await save_state({
         "next_message_time": run_time_for_morning_texts.isoformat(),
