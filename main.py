@@ -31,17 +31,17 @@ dp = Dispatcher()
 scheduler = AsyncIOScheduler()
 
 # === Функция выгрузки сообщений из JSON ===
-def json_load():
+async def json_load():
     
       with open(TEXT_FILE, 'r') as file:
             
             try:
                 data = json.load(file)
-                bot.send_message(LOGS_ID, text="✅ Сообщения успешно распакованы из JSON ✅")
+                # await bot.send_message(LOGS_ID, text="✅ Сообщения успешно распакованы из JSON ✅")
                 print("✅ Сообщения успешно распакованы из JSON ✅", flush=True)
                 return data
             except Exception as e:
-                bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️")
+                # bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️")
                 print(f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️", flush=True)
                 
 # === Объекты с данными ===
