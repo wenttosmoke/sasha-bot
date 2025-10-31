@@ -218,7 +218,7 @@ async def schedule_random_message(ID):
     # Случайное время — от 1 часа до 2 дней вперёд
     deltaforMessages = timedelta(
         days=0,
-        hours=5,
+        hours=1,
         minutes=2
         # days=random.randint(0, 7),
         # hours=random.randint(0, 23),
