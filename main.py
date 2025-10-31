@@ -158,11 +158,10 @@ async def load_state() -> dict:
 async def send_random_message():
     is_sent = 0
     total_to_sent = len(currentMessageToSend.keys())
-<<<<<<< HEAD
+
     print(f"total_to_sent={total_to_sent}", flush=True)
     print(f"current={currentMessageToSend}", flush=True)
-=======
->>>>>>> 78d9581af45263453285a35d1b204f90779b7055
+
     try:
         if "song" in currentMessageToSend:
             await bot.send_audio(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["song"]), caption=currentMessageToSend["text"])
@@ -200,12 +199,10 @@ async def send_random_message():
                 is_sent += 1
     except Exception as e:
         await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке стикера: {e} ⚠️")
-<<<<<<< HEAD
+
     print(f"total_to_sent={total_to_sent}, is_sent={is_sent}", flush=True)
     print(f"current={currentMessageToSend}", flush=True)        
-=======
-            
->>>>>>> 78d9581af45263453285a35d1b204f90779b7055
+
     if is_sent == total_to_sent:
         print(f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение успешно отправлено ✅", flush=True)
         await bot.send_message(LOGS_ID, text=f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение успешно отправлено ✅")
