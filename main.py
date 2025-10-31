@@ -274,6 +274,7 @@ async def schedule_random_morning_message(ID):
  
     # Случайное время — от 8 утра до 12 следующего дня
     deltaTuple = get_time_delta()
+    print(f"deltaTuple={deltaTuple}", flush=True)
     deltaforMorningTexts = timedelta(
         days=deltaTuple[0],
         hours=deltaTuple[1],
