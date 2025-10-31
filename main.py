@@ -31,7 +31,7 @@ dp = Dispatcher()
 scheduler = AsyncIOScheduler()
 
 # === Функция выгрузки сообщений из JSON ===
-async def json_load():
+def json_load():
     
       with open(TEXT_FILE, 'r') as file:
             
