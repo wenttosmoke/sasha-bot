@@ -35,14 +35,6 @@ stickerForMorning = {}
 
 # === Загружаем сообщения из JSON ===
 
-with open(TEXT_FILE, 'r') as file:
-        data = json.load(file)
-        sendToSasha = data["sendToSasha"]
-        morningTexts = data["morningTexts"]
-        stickerForMorning = data["stickersForMorning"]
-        print(sendToSasha)
-        print(morningTexts)
-        print(stickerForMorning)
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
@@ -269,12 +261,13 @@ async def schedule_random_morning_message(ID):
  
     # Случайное время — от 8 утра до 12 следующего дня
     deltaforMorningTexts = get_time_delta()
-    run_time_for_morning_texts = run_time = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMorningTexts
-
+    run_time_for_morning_texts = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMorningTexts
+    print("MORNING", flush=True)
+    
     text = random.choice(morningTexts)
     morningTexts.remove(text)
     choosedsticker = random.choice(stickerForMorning)
- 
+    print(f"MORNING", flush=True)
     currentMorningToSend["text"] = text
     currentMorningToSend["ID"] = ID
     currentMorningToSend["sticker"] = choosedsticker
@@ -292,6 +285,17 @@ async def schedule_random_morning_message(ID):
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
     scheduler.start()
+    with open(TEXT_FILE, 'r') as file:
+        data = json.load(file)
+        try:
+            sendToSasha = data["sendToSasha"]
+            morningTexts = data["morningTexts"]
+            stickerForMorning = data["stickersForMorning"]
+            await bot.send_message(LOGS_ID, text="✅ Сообщения успешно распакованы из JSON ✅")
+            print("✅ Сообщения успешно распакованы из JSON ✅", flush=True)
+        except Exception as e:
+            await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️")
+            print(f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️", flush=True)
     await message.answer("ну что ж, если ты это читаешь, саш, то я влип в долги.\nебаный белбет, теперь должен родине...\nно часть моего разума осталась здесь и она с тобой!\nпериодически будет тебе напоминать об одной твари, которая дрочит письки в армии.\nнаслаждайся😈")
     await bot.send_message(LOGS_ID, text=f"Пользователь с ID {message.from_user.id} запустил бота")
     await schedule_random_message(int(message.from_user.id))
