@@ -201,7 +201,8 @@ async def send_morning_message():
 
 async def schedule_random_message(ID):
     """Планирует отправку в случайную дату/время"""
-    scheduler.remove_job("random")  # очищаем прошлое задание
+    if scheduler.get_jobs("random"):
+        scheduler.remove_job("random")  # очищаем прошлое задание
  
     # Случайное время — от 1 часа до 2 дней вперёд
     deltaforMessages = timedelta(
@@ -257,7 +258,8 @@ async def schedule_random_message(ID):
 
 async def schedule_random_morning_message(ID):
     """Планирует отправку в случайную дату/время"""
-    scheduler.remove_job("morning")  # очищаем прошлое задание
+    if scheduler.get_jobs("morning"):
+        scheduler.remove_job("morning")  # очищаем прошлое задание
  
     # Случайное время — от 8 утра до 12 следующего дня
     deltaforMorningTexts = get_time_delta()
