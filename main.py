@@ -26,12 +26,13 @@ WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 
 # === Объекты с данными ===
-
-sendToSasha = {}
-morningTexts = {}
+data = await json_load()
+sendToSasha = data["sendToSasha"]
+morningTexts = data["morningTexts"]
+stickerForMorning = data["stickersForMorning"]
 currentMessageToSend = {}
 currentMorningToSend = {}
-stickerForMorning = {}
+
 
 # === Загружаем сообщения из JSON ===
 
@@ -40,6 +41,19 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 scheduler = AsyncIOScheduler()
 
+# === Функция выгрузки сообщений из JSON ===
+async def json_load():
+    
+      with open(TEXT_FILE, 'r') as file:
+            
+            try:
+                data = json.load(file)
+                await bot.send_message(LOGS_ID, text="✅ Сообщения успешно распакованы из JSON ✅")
+                print("✅ Сообщения успешно распакованы из JSON ✅", flush=True)
+                return data
+            except Exception as e:
+                await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️")
+                print(f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️", flush=True)
 
 # === Функции сохранения и загрузки рассылки из памяти ===
 
@@ -287,17 +301,7 @@ async def schedule_random_morning_message(ID):
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
     scheduler.start()
-    with open(TEXT_FILE, 'r') as file:
-        data = json.load(file)
-        try:
-            sendToSasha = data["sendToSasha"]
-            morningTexts = data["morningTexts"]
-            stickerForMorning = data["stickersForMorning"]
-            await bot.send_message(LOGS_ID, text="✅ Сообщения успешно распакованы из JSON ✅")
-            print("✅ Сообщения успешно распакованы из JSON ✅", flush=True)
-        except Exception as e:
-            await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️")
-            print(f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️", flush=True)
+    
     await message.answer("ну что ж, если ты это читаешь, саш, то я влип в долги.\nебаный белбет, теперь должен родине...\nно часть моего разума осталась здесь и она с тобой!\nпериодически будет тебе напоминать об одной твари, которая дрочит письки в армии.\nнаслаждайся😈")
     await bot.send_message(LOGS_ID, text=f"Пользователь с ID {message.from_user.id} запустил бота")
     await schedule_random_message(int(message.from_user.id))
