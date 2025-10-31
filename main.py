@@ -26,6 +26,10 @@ WEBHOOK_HOST = "https://sasha-bot-lwjs.onrender.com"  # 🌐 Укажи свой
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher()
+scheduler = AsyncIOScheduler()
+
 # === Функция выгрузки сообщений из JSON ===
 def json_load():
     
@@ -47,14 +51,6 @@ morningTexts = data["morningTexts"]
 stickerForMorning = data["stickersForMorning"]
 currentMessageToSend = {}
 currentMorningToSend = {}
-
-
-# === Загружаем сообщения из JSON ===
-
-
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
-scheduler = AsyncIOScheduler()
 
 # === Функции сохранения и загрузки рассылки из памяти ===
 
