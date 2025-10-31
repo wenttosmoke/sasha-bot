@@ -276,9 +276,9 @@ async def schedule_random_morning_message(ID):
     deltaTuple = get_time_delta()
     print(f"deltaTuple={deltaTuple}", flush=True)
     deltaforMorningTexts = timedelta(
-        days=deltaTuple[0],
-        hours=deltaTuple[1],
-        minutes=deltaTuple[2]
+        days=int(deltaTuple[0]),
+        hours=int(deltaTuple[1]),
+        minutes=int(deltaTuple[2])
     )
     run_time_for_morning_texts = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMorningTexts
     print("MORNING", flush=True)
