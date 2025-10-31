@@ -29,7 +29,10 @@ sendToSasha = {
         "texts":[
             "привет, солнце, очень скучаю по тебе. надеюсь тёма тебя не терроризирует😼",
             "если ты ещё не кушала, то быстро, вперёд. хорошее начало или завершение дня. не бери на себя много. ты большая умничка❤️",
-            "ДА ПОЧЕМУ ТЫ ТАКОЙ КОТИК, АОАЦГАЦГАОЦАОЦГШ"
+            "ДА ПОЧЕМУ ТЫ ТАКОЙ КОТИК, АОАЦГАЦГАОЦАОЦГШ",
+            "чаще в зеркало смотри, нужно же заполнять ежедневную норму увиденных котят",
+            "когда приеду, заобнимаю тебя, не убежишь!",
+            "скучаю(..."
         ],
         "withPhoto":[0, 1],
         "photos": [
@@ -51,9 +54,14 @@ sendToSasha = {
     },
     "jokeMessages":{
         "texts":[
-            "я в армии буквально: \"за что мут, суки...\"",
+            "я в армии я буквально: \"за что мут, суки...\"",
             "в армии радует только, что моя попа в безопасности😈",
-            "спишь?\nдаже через бота могу такое делать😈😈😈"
+            "спишь?\nдаже через бота могу такое делать😈😈😈",
+            "отец цыганин очень часто видит своего сына в школе. просто сын учится в третьем классе, а отец в десятом...",
+            "кунилинукс",
+            "в душ? и без меня...",
+            "как впн для телевизора поставить?",
+            "когда там...это самое"
         ],
         "withPhoto":[0, 1],
         "photos":[
@@ -77,7 +85,9 @@ sendToSasha = {
         "texts":[
             "приветик, как диплом?",
             "погода сегодня говорит о том, что такое солнышко как ты должно гулять и дарить другим людям улыбки",
-            "как себя чувствуешь?"
+            "как себя чувствуешь?",
+            "говорят, что если долго смотреть в этот чат, можно думать о владике😈",
+            "о чем сейчас думаешь?"
         ],
         "withPhoto":[0, 1],
         "photos":[
@@ -97,7 +107,14 @@ sendToSasha = {
             "сегодня эта песня напоминает о тебе",
             "тёмный принц СКОКА СКОКА СКОКА",
             "перед тобой я подбираю слова, но поверь они не передадут",
-            "ты разочаровалась в моём вокале?"
+            "ты разочаровалась в моём вокале?",
+            "think i like you, best when u just with me...and no one else",
+            "я нафармил крипты как скуф",
+            "твоё тепло в моей руке, всё остальное неважно",
+            "наш трек?",
+            "and when you far away...i still feel it all...",
+            "не теряй меня никогда, даже в дождь, или долгую зимнюю вьюгу.",
+            "r u mine?"
         ],
         "songs": [
             "songs/1.mp3",
@@ -140,13 +157,16 @@ async def load_state() -> dict:
 # === Функция случайной рассылки ===
 async def send_random_message():
     is_sent = 0
+    total_to_sent = len(currentMessageToSend.keys())
+    print(f"total_to_sent={total_to_sent}", flush=True)
+    print(f"current={currentMessageToSend}", flush=True)
     try:
         if "song" in currentMessageToSend:
             await bot.send_audio(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["song"]), caption=currentMessageToSend["text"])
             await bot.send_audio(GROUP_ID, FSInputFile(currentMessageToSend["song"]), caption=currentMessageToSend["text"])
             del currentMessageToSend["text"]
             del currentMessageToSend["song"]
-            is_sent += 1
+            is_sent += 2
     except Exception as e:
         await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке песни с текстом: {e} ⚠️")
 
@@ -156,7 +176,7 @@ async def send_random_message():
                 await bot.send_photo(GROUP_ID, FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
                 del currentMessageToSend["text"]
                 del currentMessageToSend["photo"]
-                is_sent += 1
+                is_sent += 2
     except Exception as e:
         await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке фото с текстом: {e} ⚠️")
 
@@ -177,8 +197,9 @@ async def send_random_message():
                 is_sent += 1
     except Exception as e:
         await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке стикера: {e} ⚠️")
-            
-    if is_sent == len(currentMessageToSend.keys()):
+    print(f"total_to_sent={total_to_sent}, is_sent={is_sent}", flush=True)
+    print(f"current={currentMessageToSend}", flush=True)        
+    if is_sent == total_to_sent:
         print(f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение успешно отправлено ✅", flush=True)
         await bot.send_message(LOGS_ID, text=f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение успешно отправлено ✅")
         os.remove(STATE_FILE)
@@ -211,8 +232,8 @@ async def schedule_random_message(ID):
     # Случайное время — от 1 часа до 2 дней вперёд
     delta = timedelta(
         days=0,
-        hours=random.randint(0, 1),
-        minutes=random.randint(0, 59)
+        hours=0,
+        minutes=2
         # days=random.randint(0, 7),
         # hours=random.randint(0, 23),
         # minutes=random.randint(0, 59)
@@ -273,8 +294,7 @@ async def start_cmd(message: types.Message):
 async def echo_msg(message: types.Message):
     if message.chat.id == message.from_user.id:
         await message.reply("хых, я бы ответил, но я дрочу письки(\nпрости, солнце, я обязательно вернусь!\nнадеюсь у тебя всё хорошо")
-        message_date_utc = pytz.utc.localize(message.date)
-        await bot.send_message(GROUP_ID, text="❗❗❗ Она ответила " + str(message_date_utc.astimezone(pytz.timezone("Europe/Moscow")))[:-6] + " ❗❗❗")
+        await bot.send_message(GROUP_ID, text="❗❗❗ Она ответила ❗❗❗")
         await bot.forward_message(
             chat_id=GROUP_ID,          
             from_chat_id=message.chat.id,  
