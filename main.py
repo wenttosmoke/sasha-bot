@@ -291,7 +291,7 @@ async def schedule_random_morning_message(ID):
     currentMorningToSend["ID"] = ID
     currentMorningToSend["sticker"] = choosedsticker
 
-    await bot.send_message(LOGS_ID, text=f"❕\tСледующее утреннее сообщение:\t❕\nТекст: {currentMorningToSend["text"]}\nСтикер: {currentMorningToSend["sticker"] if "" in currentMorningToSend else ""}")
+    await bot.send_message(LOGS_ID, text=f"❕\tСледующее утреннее сообщение:\t❕\nТекст: {currentMorningToSend["text"]}\nСтикер: {currentMorningToSend["sticker"]}")
     scheduler.add_job(send_morning_message, "date", run_date=run_time_for_morning_texts, id="morning")
     await save_state({
         "next_message_time": run_time_for_morning_texts.isoformat(),
@@ -312,6 +312,7 @@ async def start_cmd(message: types.Message):
         await schedule_random_morning_message(int(message.from_user.id))
     else:
         await bot.send_message(LOGS_ID, text=f"❌ Пользователь с ID {message.from_user.id} попытался запустить бота ❌")
+        await message.answer("ты кто, съебался нахуй, бот не для тебя😡")
 
 
     
