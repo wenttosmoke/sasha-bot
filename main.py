@@ -15,6 +15,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 API_TOKEN = os.getenv("API_TOKEN")
 GROUP_ID = int(os.getenv("GROUP_ID"))
 LOGS_ID = int(os.getenv("LOGS_ID"))
+MY_ID = int(os.getenv("MY_ID"))
+SASHA_ID = int(os.getenv("SASHA_ID"))
 STATE_DIR ="json"
 STATE_FILE = os.path.join(STATE_DIR, "state.json")
 TEXT_FILE = os.path.join(STATE_DIR, "texts.json")
@@ -299,26 +301,31 @@ async def schedule_random_morning_message(ID):
 # === Обработчики команд и сообщений ===
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
-    scheduler.start()
-    
-    await message.answer("ну что ж, если ты это читаешь, саш, то я влип в долги.\nебаный белбет, теперь должен родине...\nно часть моего разума осталась здесь и она с тобой!\nпериодически будет тебе напоминать об одной твари, которая дрочит письки в армии.\nнаслаждайся😈")
-    await bot.send_message(LOGS_ID, text=f"Пользователь с ID {message.from_user.id} запустил бота")
-    await schedule_random_message(int(message.from_user.id))
-    await schedule_random_morning_message(int(message.from_user.id))
+    if int(message.from_user.id) == MY_ID or int(message.from_user.id) == SASHA_ID:
+        scheduler.start()
+        
+        await message.answer("ну что ж, если ты это читаешь, саш, то я влип в долги.\nебаный белбет, теперь должен родине...\nно часть моего разума осталась здесь и она с тобой!\nпериодически будет тебе напоминать об одной твари, которая дрочит письки в армии.\nнаслаждайся😈")
+        await bot.send_message(LOGS_ID, text=f"✅ Пользователь с ID {message.from_user.id} запустил бота ✅")
+        await schedule_random_message(int(message.from_user.id))
+        await schedule_random_morning_message(int(message.from_user.id))
+    else:
+        await bot.send_message(LOGS_ID, text=f"❌ Пользователь с ID {message.from_user.id} попытался запустить бота ❌")
+
 
     
 
 
 @dp.message()
 async def echo_msg(message: types.Message):
-    if message.chat.id == message.from_user.id:
-        await message.reply("хых, я бы ответил, но я дрочу письки(\nпрости, солнце, я обязательно вернусь!\nнадеюсь у тебя всё хорошо")
-        await bot.send_message(GROUP_ID, text="❗❗❗ Она ответила ❗❗❗")
-        await bot.forward_message(
-            chat_id=GROUP_ID,          
-            from_chat_id=message.chat.id,  
-            message_id=message.message_id
-        )
+    if int(message.from_user.id) == MY_ID or int(message.from_user.id) == SASHA_ID:
+        if message.chat.id == message.from_user.id:
+            await message.reply("хых, я бы ответил, но я дрочу письки(\nпрости, солнце, я обязательно вернусь!\nнадеюсь у тебя всё хорошо")
+            await bot.send_message(GROUP_ID, text="❗❗❗ Она ответила ❗❗❗")
+            await bot.forward_message(
+                chat_id=GROUP_ID,          
+                from_chat_id=message.chat.id,  
+                message_id=message.message_id
+            )
 
 # === Основной запуск ===
 async def run_http_server(port: int):
