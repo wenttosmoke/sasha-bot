@@ -26,7 +26,7 @@ WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 
 # === Объекты с данными ===
-data = await json_load()
+data = json_load()
 sendToSasha = data["sendToSasha"]
 morningTexts = data["morningTexts"]
 stickerForMorning = data["stickersForMorning"]
