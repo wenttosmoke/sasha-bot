@@ -273,7 +273,7 @@ async def schedule_random_morning_message(ID):
         scheduler.remove_job("morning")  # очищаем прошлое задание
  
     # Случайное время — от 8 утра до 12 следующего дня
-    deltaTuple = get_time_delta()
+    deltaTuple = get_time_delta()[0]
     print(f"deltaTuple={deltaTuple}", flush=True)
     deltaforMorningTexts = timedelta(
         days=int(deltaTuple[0]),
