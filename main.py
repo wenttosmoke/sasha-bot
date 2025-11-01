@@ -227,7 +227,7 @@ async def schedule_random_message(ID):
 
     run_time = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMessages
     message = random.choice(list(sendToSasha.keys()))
-    while len(sendToSasha[message]['texts']) == 0:
+    while len(sendToSasha[message]["texts"]) == 0:
         print(f"⚠️ Закончились строки {sendToSasha[message]}", flush=True)
         await bot.send_message(LOGS_ID, text=f"⚠️ Закончились строки {message}")
         del sendToSasha[message]
