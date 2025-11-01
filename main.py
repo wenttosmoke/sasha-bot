@@ -82,7 +82,7 @@ def get_time_delta():
     now = datetime.now(pytz.timezone("Europe/Moscow")) 
     print(now)
     # Следующий день 08:00
-    tomorrow_8am = (now + timedelta(days=1)).replace(hour=8, minute=0, second=0, microsecond=0)
+    tomorrow_8am = (now + timedelta(days=0)).replace(hour=8, minute=0, second=0, microsecond=0)
     
     # Случайное время между 08:00 и 12:00 следующего дня
     random_minutes = random.randint(0, 4 * 60)  # 4 часа = 240 минут
