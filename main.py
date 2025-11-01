@@ -227,15 +227,12 @@ async def schedule_random_message(ID):
 
     run_time = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMessages
     message = random.choice(list(sendToSasha.keys()))
-    print(message, flush=True)
-    print(sendToSasha[message]["texts"], flush=True)
-    while len(sendToSasha[message]["texts"]) == 0:
-        print(f"⚠️ Закончились строки {sendToSasha[message]}", flush=True)
-        await bot.send_message(LOGS_ID, text=f"⚠️ Закончились строки {message}")
-        del sendToSasha[message]
-        message = random.choice(list(sendToSasha.keys()))
-    
     if message != "withSong":
+        while len(sendToSasha[message]["texts"]) == 0:
+            print(f"⚠️ Закончились строки {sendToSasha[message]}", flush=True)
+            await bot.send_message(LOGS_ID, text=f"⚠️ Закончились строки {message}")
+            del sendToSasha[message]
+            message = random.choice(list(sendToSasha.keys()))
         text = random.choice(sendToSasha[message]["texts"])
         sendToSasha[message]["texts"].remove(text)
     
