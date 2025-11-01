@@ -78,7 +78,7 @@ async def load_state(file) -> dict:
 
 # === Функции проверки на случай праздников ===
 
-async def check_and_send_special_day(ID):
+async def check_and_send_special_day():
     now = datetime.now(pytz.timezone("Europe/Moscow"))
     day = now.day
     month = now.month
@@ -92,7 +92,7 @@ async def check_and_send_special_day(ID):
 
     if (month, day) in special_days:
         text = special_days[(month, day)]
-        await bot.send_message(ID, text=text)
+        await bot.send_message(MY_ID, text=text)
         await bot.send_message(GROUP_ID, text=text)
         await bot.send_message(LOGS_ID, text=f"🎉 Отправлено праздничное сообщение за {now.strftime('%d.%m.%Y')}:\n{text}")
     else:
@@ -338,7 +338,7 @@ async def start_cmd(message: types.Message):
         await bot.send_message(LOGS_ID, text=f"✅ Пользователь с ID {message.from_user.id} запустил бота ✅")
         await schedule_random_message(int(message.from_user.id))
         await schedule_random_morning_message(int(message.from_user.id))
-        scheduler.add_job(check_and_send_special_day(int(message.from_user.id)), "cron", hour=0, minute=0, timezone=pytz.timezone("Europe/Moscow"), id="daily_special_check")
+        scheduler.add_job(check_and_send_special_day, "cron", hour=0, minute=0, timezone=pytz.timezone("Europe/Moscow"), id="daily_special_check")
     else:
         await bot.send_message(LOGS_ID, text=f"❌ Пользователь с ID {message.from_user.id} попытался запустить бота ❌")
         await message.answer("ты кто, съебался нахуй, бот не для тебя😡")
