@@ -219,7 +219,7 @@ async def schedule_random_message(ID):
     deltaforMessages = timedelta(
         days=0,
         hours=0,
-        minutes=15
+        minutes=5
         # days=random.randint(0, 7),
         # hours=random.randint(0, 23),
         # minutes=random.randint(0, 59)
