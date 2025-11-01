@@ -227,13 +227,18 @@ async def schedule_random_message(ID):
 
     run_time = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMessages
     message = random.choice(list(sendToSasha.keys()))
-    text = random.choice(sendToSasha[message]["texts"])
-    sendToSasha[message]["texts"].remove(text)
-
+    if message != "withSong":
+        text = random.choice(sendToSasha[message]["texts"])
+        sendToSasha[message]["texts"].remove(text)
+    if len(sendToSasha[message]["texts"]) == 0:
+        print(f"⚠️ Закончились строки {sendToSasha[message]}", flush=True)
+        await bot.send_message(LOGS_ID, text=f"⚠️ Закончились строки {sendToSasha[message]}")
+        sendToSasha.remove(message)
     if message == "withSong":
         try:
             print(f"Сообщение будет отправлено с песней.", flush=True)
-            currentMessageToSend["song"] = random.choice(sendToSasha[message]["songs"])
+            currentMessageToSend["song"] = random.choice(sendToSasha[message]["songs"].keys())
+            currentMessageToSend["text"] = sendToSasha[message]["songs"][currentMessageToSend["song"]]
             sendToSasha[message]["songs"].remove(currentMessageToSend["song"])
         except Exception as e:
             print(f"⚠️ Ошибка при выборе песни: {e}", flush=True)
