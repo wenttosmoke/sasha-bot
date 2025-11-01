@@ -82,7 +82,7 @@ def get_time_delta():
     now = datetime.now(pytz.timezone("Europe/Moscow")) 
     print(now)
     # Следующий день 08:00
-    tomorrow_8am = (now + timedelta(days=0)).replace(hour=8, minute=0, second=0, microsecond=0)
+    tomorrow_8am = (now + timedelta(days=1)).replace(hour=8, minute=0, second=0, microsecond=0)
     
     # Случайное время между 08:00 и 12:00 следующего дня
     random_minutes = random.randint(0, 4 * 60)  # 4 часа = 240 минут
@@ -218,8 +218,8 @@ async def schedule_random_message(ID):
     # Случайное время — от 1 часа до 2 дней вперёд
     deltaforMessages = timedelta(
         days=0,
-        hours=1,
-        minutes=2
+        hours=0,
+        minutes=15
         # days=random.randint(0, 7),
         # hours=random.randint(0, 23),
         # minutes=random.randint(0, 59)
@@ -227,13 +227,16 @@ async def schedule_random_message(ID):
 
     run_time = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMessages
     message = random.choice(list(sendToSasha.keys()))
+    while len(sendToSasha[message]['texts']) == 0:
+        print(f"⚠️ Закончились строки {sendToSasha[message]}", flush=True)
+        await bot.send_message(LOGS_ID, text=f"⚠️ Закончились строки {message}")
+        del sendToSasha[message]
+        message = random.choice(list(sendToSasha.keys()))
+    
     if message != "withSong":
         text = random.choice(sendToSasha[message]["texts"])
         sendToSasha[message]["texts"].remove(text)
-    if len(sendToSasha[message]["texts"]) == 0:
-        print(f"⚠️ Закончились строки {sendToSasha[message]}", flush=True)
-        await bot.send_message(LOGS_ID, text=f"⚠️ Закончились строки {sendToSasha[message]}")
-        sendToSasha.remove(message)
+    
     if message == "withSong":
         try:
             print(f"Сообщение будет отправлено с песней.", flush=True)
