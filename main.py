@@ -76,6 +76,28 @@ async def load_state(file) -> dict:
         await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при загрузке запланированного сообщения из памяти: {e}")
     return {}
 
+# === Функции проверки на случай праздников ===
+
+async def check_and_send_special_day():
+    now = datetime.now(pytz.timezone("Europe/Moscow"))
+    day = now.day
+    month = now.month
+
+    special_days = {
+        (1, 1): "с новым годом, солнце! так скучаю по тебе, наверное мою лысую голову укрыло слоем снега, смешная картина. пусть этот год начнётся у тебя также хорошо, как заканчивался мой 2025, когда я познакомился с тобой. я раньше и не думал, что котики могут так хорошо выдавать себя за людей...будь счастлива, уже не так много осталось, и если ты ещё ждёшь меня, я обязательно к тебе вернусь. с новым годом, люблю тебя❤️",
+        (11, 2): "с днём рождения, сашенька!❤️ твой день, тебе уже 22, ты уже совсем взрослы котик блин...так надеюсь, что я смогу подарить тебе хоть что-то, но больше всего я хочу тебя увидеть. эгоистично, что подарки в твой день рождения хочу я? ахахах. солнце, ты самая красивое пушистое из семейства кошачьих, на твоём лице хочется видеть только улыбку, которая озоряет своим светом простор. надеюсь, что сейчас, читая этот текст ты улыбаешься. если да, то моя миссия выполнена. ты со всем справишься, ты моя самая большая умничка. люблю тебя❤️",
+        (3, 8): "с 8 марта, моя принцесса! надеюсь мы с тобой уже хоть раз увиделись, либо видимся уже сейчас, когда ты это читаешь. сегодня твой день, сегодня я готов сорвать все цветы на полянах, скупить всё в магазнах...ладно, денег нет, на самом деле нарву с могил...шутка! очень надеюсь, что у нас получилось(-ся) встретиться, ведь я так хочу ещё хоть раз тебе подарить букетик и увидеть твою улыбку... 💐",
+        (5, 26): "с днём рождения, сашенька!❤️ твой день, тебе уже 22, ты уже совсем взрослы котик блин...так надеюсь, что я смогу подарить тебе хоть что-то, но больше всего я хочу тебя увидеть. эгоистично, что подарки в твой день рождения хочу я? ахахах. солнце, ты самая красивое пушистое из семейства кошачьих, на твоём лице хочется видеть только улыбку, которая озоряет своим светом простор. надеюсь, что сейчас, читая этот текст ты улыбаешься. если да, то моя миссия выполнена. ты со всем справишься, ты моя самая большая умничка. люблю тебя❤️"
+    }
+
+    if (month, day) in special_days:
+        text = special_days[(month, day)]
+        await bot.send_message(SASHA_ID, text=text)
+        await bot.send_message(GROUP_ID, text=text)
+        await bot.send_message(LOGS_ID, text=f"🎉 Отправлено праздничное сообщение за {now.strftime('%d.%m.%Y')}:\n{text}")
+    else:
+        print(f"📅 Сегодня {now.strftime('%d.%m.%Y')} — обычный день", flush=True)
+
 # === Функции вычисления времени до следующего утра ===
 
 def get_time_delta():
@@ -227,25 +249,24 @@ async def schedule_random_message(ID):
 
     run_time = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMessages
     message = random.choice(list(sendToSasha.keys()))
-    if message != "withSong":
-        while len(sendToSasha[message]["texts"]) == 0:
+    while (message != "withSong" and len(sendToSasha[message]["texts"]) == 0) or (message == "withSong" and len(sendToSasha[message]["songs"]) == 0):
             print(f"⚠️ Закончились строки {sendToSasha[message]}", flush=True)
             await bot.send_message(LOGS_ID, text=f"⚠️ Закончились строки {message}")
             del sendToSasha[message]
             message = random.choice(list(sendToSasha.keys()))
-        text = random.choice(sendToSasha[message]["texts"])
-        sendToSasha[message]["texts"].remove(text)
-    
+
     if message == "withSong":
         try:
             print(f"Сообщение будет отправлено с песней.", flush=True)
-            currentMessageToSend["song"] = random.choice(sendToSasha[message]["songs"].keys())
+            currentMessageToSend["song"] = random.choice(list(sendToSasha[message]["songs"].keys()))
             currentMessageToSend["text"] = sendToSasha[message]["songs"][currentMessageToSend["song"]]
-            sendToSasha[message]["songs"].remove(currentMessageToSend["song"])
+            del sendToSasha[message]["songs"][currentMessageToSend["song"]]
         except Exception as e:
             print(f"⚠️ Ошибка при выборе песни: {e}", flush=True)
             await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при выборе песни: {e}")
     else:
+        text = random.choice(sendToSasha[message]["texts"])
+        sendToSasha[message]["texts"].remove(text)
         if random.choice(sendToSasha[message]["withPhoto"]) == 1:
             try:
                 print(f"Сообщение будет отправлено с фото.", flush=True)   
@@ -261,7 +282,7 @@ async def schedule_random_message(ID):
             except Exception as e:
                 print(f"⚠️ Ошибка при выборе стикера: {e}", flush=True)
                 await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при выборе стикера: {e}")
-    currentMessageToSend["text"] = text
+        currentMessageToSend["text"] = text
     currentMessageToSend["ID"] = ID
     await bot.send_message(LOGS_ID, text=f"❕\tСледующее сообщение:\t❕\nТекст: {currentMessageToSend["text"]}\nФото: {currentMessageToSend["photo"] if "photo" in currentMessageToSend else ""}\nСтикер: {currentMessageToSend["sticker"] if "" in currentMessageToSend else ""}\nПесня: {currentMessageToSend["song"] if "song" in currentMessageToSend else ""}")
     scheduler.add_job(send_random_message, "date", run_date=run_time, id="random")
@@ -317,6 +338,7 @@ async def start_cmd(message: types.Message):
         await bot.send_message(LOGS_ID, text=f"✅ Пользователь с ID {message.from_user.id} запустил бота ✅")
         await schedule_random_message(int(message.from_user.id))
         await schedule_random_morning_message(int(message.from_user.id))
+        scheduler.add_job(check_and_send_special_day, "cron", hour=0, minute=0, timezone=pytz.timezone("Europe/Moscow"), id="daily_special_check")
     else:
         await bot.send_message(LOGS_ID, text=f"❌ Пользователь с ID {message.from_user.id} попытался запустить бота ❌")
         await message.answer("ты кто, съебался нахуй, бот не для тебя😡")
