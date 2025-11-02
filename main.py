@@ -175,39 +175,39 @@ async def restore_scheduler_state():
                 
             # Восстанавливаем задачи по их ID
             job_id = job_data.get('id')
-            if job_id == "random":
-                if not scheduler.get_job("random"):
+            if job_id == f"random{SASHA_ID}":
+                if not scheduler.get_job(f"random{SASHA_ID}"):
                     scheduler.add_job(
                         send_random_message, 
                         "date", 
                         run_date=run_time, 
-                        id="random"
+                        id=f"random{SASHA_ID}"
                     )
                     restored_count += 1
-                    print(f"♻️ Восстановлена задача random на {run_time}", flush=True)
+                    print(f"♻️ Восстановлена задача random{SASHA_ID} на {run_time}", flush=True)
                     
-            elif job_id == "morning":
-                if not scheduler.get_job("morning"):
+            elif job_id == f"morning{SASHA_ID}":
+                if not scheduler.get_job(f"morning{SASHA_ID}"):
                     scheduler.add_job(
                         send_morning_message, 
                         "date", 
                         run_date=run_time, 
-                        id="morning"
+                        id=f"morning{SASHA_ID}"
                     )
                     restored_count += 1
-                    print(f"♻️ Восстановлена задача morning на {run_time}", flush=True)
+                    print(f"♻️ Восстановлена задача morning{SASHA_ID} на {run_time}", flush=True)
                     
-            elif job_id == "daily_special_check":
-                if not scheduler.get_job("daily_special_check"):
+            elif job_id == f"daily_special_check{SASHA_ID}":
+                if not scheduler.get_job(f"daily_special_check{SASHA_ID}"):
                     scheduler.add_job(
                         check_and_send_special_day, 
                         "cron", 
                         hour=0, minute=0, 
                         timezone=pytz.timezone("Europe/Moscow"), 
-                        id="daily_special_check"
+                        id=f"daily_special_check{SASHA_ID}"
                     )
                     restored_count += 1
-                    print(f"♻️ Восстановлена задача daily_special_check", flush=True)
+                    print(f"♻️ Восстановлена задача daily_special_check{SASHA_ID}", flush=True)
                 
         except Exception as e:
             print(f"⚠️ Ошибка при восстановлении задачи {job_data.get('id')}: {e}", flush=True)
@@ -436,7 +436,7 @@ async def schedule_random_message(ID):
     """Планирует отправку с сохранением состояния"""
     try:
         # Удаляем старую задачу если есть
-        old_job = scheduler.get_job("random")
+        old_job = scheduler.get_job(f"random{SASHA_ID}")
         if old_job:
             old_job.remove()
  
@@ -490,7 +490,7 @@ async def schedule_random_message(ID):
         currentMessageToSend["ID"] = ID
         
         # Добавляем задачу в планировщик
-        scheduler.add_job(send_random_message, "date", run_date=run_time, id="random")
+        scheduler.add_job(send_random_message, "date", run_date=run_time, id=f"random{SASHA_ID}")
         
         # Сохраняем состояние
         await save_message_queue()
@@ -509,7 +509,7 @@ async def schedule_random_morning_message(ID):
     """Планирует утреннюю отправку с сохранением состояния"""
     try:
         # Удаляем старую задачу если есть
-        old_job = scheduler.get_job("morning")
+        old_job = scheduler.get_job(f"morning{SASHA_ID}")
         if old_job:
             old_job.remove()
  
@@ -532,7 +532,7 @@ async def schedule_random_morning_message(ID):
         currentMorningToSend["sticker"] = choosedsticker
 
         # Добавляем задачу в планировщик
-        scheduler.add_job(send_morning_message, "date", run_date=run_time_for_morning_texts, id="morning")
+        scheduler.add_job(send_morning_message, "date", run_date=run_time_for_morning_texts, id=f"morning{SASHA_ID}")
         
         # Сохраняем состояние
         await save_message_queue()
@@ -555,7 +555,7 @@ async def start_cmd(message: types.Message):
         await bot.send_message(LOGS_ID, text=f"✅ Пользователь с ID {message.from_user.id} запустил бота ✅")
         await schedule_random_message(int(message.from_user.id))
         await schedule_random_morning_message(int(message.from_user.id))
-        scheduler.add_job(check_and_send_special_day, "cron", hour=12, minute=40, timezone=pytz.timezone("Europe/Moscow"), id="daily_special_check")
+        scheduler.add_job(check_and_send_special_day, "cron", hour=12, minute=40, timezone=pytz.timezone("Europe/Moscow"), id=f"daily_special_check{SASHA_ID}")
     else:
         await bot.send_message(LOGS_ID, text=f"❌ Пользователь с ID {message.from_user.id} попытался запустить бота ❌")
         await message.answer("ты кто, съебался нахуй, бот не для тебя😡")
@@ -722,8 +722,8 @@ async def main():
     now = datetime.now(pytz.timezone("Europe/Moscow"))
     
     # Проверяем, есть ли активные задачи
-    random_job = scheduler.get_job("random")
-    morning_job = scheduler.get_job("morning")
+    random_job = scheduler.get_job(f"random{SASHA_ID}")
+    morning_job = scheduler.get_job(f"morning{SASHA_ID}")
     
     if random_job:
        print(f"✅ Задача random активна, следующее выполнение: {random_job.next_run_time}", flush=True)
@@ -733,13 +733,13 @@ async def main():
 
     
     # Добавляем ежедневную проверку праздников если её нет
-    if not scheduler.get_job("daily_special_check"):
+    if not scheduler.get_job(f"daily_special_check{SASHA_ID}"):
         scheduler.add_job(
             check_and_send_special_day, 
             "cron", 
             hour=0, minute=0, 
             timezone=pytz.timezone("Europe/Moscow"), 
-            id="daily_special_check"
+            id=f"daily_special_check{SASHA_ID}"
         )
         print("✅ Добавлена ежедневная проверка праздников", flush=True)
     
