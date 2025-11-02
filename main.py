@@ -84,11 +84,23 @@ async def save_scheduler_state():
     """Сохраняет состояние планировщика"""
     jobs_data = []
     for job in scheduler.get_jobs():
-        jobs_data.append({
+        job_info = {
             'id': job.id,
-            'next_run_time': job.next_run_time.isoformat() if job.next_run_time else None,
-            'func': job.func.__name__ if hasattr(job.func, '__name__') else str(job.func)
-        })
+            'func': job.func.__name__ if hasattr(job.func, '__name__') else str(job.func),
+            'trigger_type': str(job.trigger)
+        }
+        
+        # Безопасно получаем next_run_time
+        if job.next_run_time:
+            job_info['next_run_time'] = job.next_run_time.isoformat()
+        else:
+            job_info['next_run_time'] = None
+            
+        # Сохраняем аргументы если это наши задачи
+        if job.id in ["random", "morning"] and job.kwargs:
+            job_info['kwargs'] = job.kwargs
+            
+        jobs_data.append(job_info)
     
     await save_state({'jobs': jobs_data}, SCHEDULER_STATE_FILE)
 
@@ -100,15 +112,49 @@ async def restore_scheduler_state():
     if not state or 'jobs' not in state:
         return
     
+    now = datetime.now(pytz.timezone("Europe/Moscow"))
+    
     for job_data in state['jobs']:
-        if job_data['func'] == 'send_random_message':
+        try:
+            if not job_data.get('next_run_time'):
+                continue
+                
             run_time = datetime.fromisoformat(job_data['next_run_time'])
-            if run_time > datetime.now(pytz.timezone("Europe/Moscow")):
-                scheduler.add_job(send_random_message, "date", run_date=run_time, id=job_data['id'])
-        elif job_data['func'] == 'send_morning_message':
-            run_time = datetime.fromisoformat(job_data['next_run_time'])
-            if run_time > datetime.now(pytz.timezone("Europe/Moscow")):
-                scheduler.add_job(send_morning_message, "date", run_date=run_time, id=job_data['id'])
+            
+            # Если время уже прошло, пропускаем
+            if run_time <= now:
+                continue
+                
+            if job_data['id'] == "random":
+                scheduler.add_job(
+                    send_random_message, 
+                    "date", 
+                    run_date=run_time, 
+                    id="random"
+                )
+                print(f"♻️ Восстановлена задача random на {run_time}", flush=True)
+                
+            elif job_data['id'] == "morning":
+                scheduler.add_job(
+                    send_morning_message, 
+                    "date", 
+                    run_date=run_time, 
+                    id="morning"
+                )
+                print(f"♻️ Восстановлена задача morning на {run_time}", flush=True)
+                
+            elif job_data['id'] == "daily_special_check":
+                # Для cron задач просто пересоздаем
+                scheduler.add_job(
+                    check_and_send_special_day, 
+                    "cron", 
+                    hour=0, minute=0, 
+                    timezone=pytz.timezone("Europe/Moscow"), 
+                    id="daily_special_check"
+                )
+                
+        except Exception as e:
+            print(f"⚠️ Ошибка при восстановлении задачи {job_data.get('id')}: {e}", flush=True)
 
 # === Функция сохранения очереди сообщений ===
 
@@ -389,19 +435,16 @@ async def schedule_random_morning_message(ID):
     
         # Случайное время — от 8 утра до 12 следующего дня
         deltaTuple = get_time_delta()[0]
-        print(f"deltaTuple={deltaTuple}", flush=True)
         deltaforMorningTexts = timedelta(
             days=int(deltaTuple[0]),
             hours=int(deltaTuple[1]),
             minutes=int(deltaTuple[2])
         )
         run_time_for_morning_texts = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMorningTexts
-        print("MORNING", flush=True)
         
         text = random.choice(morningTexts)
         morningTexts.remove(text)
         choosedsticker = random.choice(stickerForMorning)
-        print(f"MORNING", flush=True)
         currentMorningToSend["text"] = text
         currentMorningToSend["ID"] = ID
         currentMorningToSend["sticker"] = choosedsticker
@@ -470,18 +513,31 @@ async def run_http_server(port: int):
 def setup_cleanup():
     """Настройка обработчиков для корректного завершения"""
     async def cleanup():
-        print("💾 Сохранение состояния перед завершением...", flush=True)
-        await save_message_queue()
-        await save_scheduler_state()
-        if scheduler.running:
-            scheduler.shutdown()
-        print("✅ Состояние сохранено, планировщик остановлен", flush=True)
+        try:
+            print("💾 Сохранение состояния перед завершением...", flush=True)
+            await save_message_queue()
+            await save_scheduler_state()
+            if scheduler.running:
+                scheduler.shutdown()
+            print("✅ Состояние сохранено, планировщик остановлен", flush=True)
+        except Exception as e:
+            print(f"⚠️ Ошибка при сохранении состояния: {e}", flush=True)
     
     def signal_handler(signum, frame):
         print(f"📞 Получен сигнал {signum}, сохраняем состояние...", flush=True)
-        asyncio.create_task(cleanup())
+        # Используем asyncio.run для надежности
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(cleanup())
+            else:
+                asyncio.run(cleanup())
+        except:
+            # Последняя попытка синхронно
+            import asyncio as async_lib
+            async_lib.run(cleanup())
     
-    # Регистрируем обработчики сигналов (только на Linux/Mac)
+    # Регистрируем обработчики сигналов
     try:
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
