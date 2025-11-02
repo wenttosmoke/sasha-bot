@@ -46,10 +46,10 @@ def json_load():
         print(f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️", flush=True)
                 
 # === Объекты с данными ===
-data = json_load()
-sendToSasha = data.get("sendToSasha", {})
-morningTexts = data.get("morningTexts", [])
-stickerForMorning = data.get("stickersForMorning", [])
+# data = json_load()
+# sendToSasha = data.get("sendToSasha", {})
+# morningTexts = data.get("morningTexts", [])
+# stickerForMorning = data.get("stickersForMorning", [])
 currentMessageToSend = {}
 currentMorningToSend = {}
 
@@ -697,20 +697,25 @@ async def main():
     
     # Проверяем задачу random
     random_job = scheduler.get_job("random")
-    if not random_job:
-        print("🔄 Создание новой задачи random...", flush=True)
-        target_id = currentMessageToSend.get("ID", SASHA_ID)
-        await schedule_random_message(target_id)
-    else:
+    # if not random_job:
+    #     print("🔄 Создание новой задачи random...", flush=True)
+    #     target_id = currentMessageToSend.get("ID", SASHA_ID)
+    #     await schedule_random_message(target_id)
+    # else:
+    #     print(f"✅ Задача random активна, следующее выполнение: {random_job.next_run_time}", flush=True)
+    if random_job:
         print(f"✅ Задача random активна, следующее выполнение: {random_job.next_run_time}", flush=True)
     
+        
     # Проверяем задачу morning  
     morning_job = scheduler.get_job("morning")
-    if not morning_job:
-        print("🔄 Создание новой задачи morning...", flush=True)
-        target_id = currentMorningToSend.get("ID", SASHA_ID)
-        await schedule_random_morning_message(target_id)
-    else:
+    # if not morning_job:
+    #     print("🔄 Создание новой задачи morning...", flush=True)
+    #     target_id = currentMorningToSend.get("ID", SASHA_ID)
+    #     await schedule_random_morning_message(target_id)
+    # else:
+    #     print(f"✅ Задача morning активна, следующее выполнение: {morning_job.next_run_time}", flush=True)
+    if morning_job:
         print(f"✅ Задача morning активна, следующее выполнение: {morning_job.next_run_time}", flush=True)
 
     # 9) Сохраняем начальное состояние
