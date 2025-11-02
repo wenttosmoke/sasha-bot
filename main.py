@@ -46,10 +46,10 @@ def json_load():
         print(f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️", flush=True)
                 
 # === Объекты с данными ===
-# data = json_load()
-# sendToSasha = data.get("sendToSasha", {})
-# morningTexts = data.get("morningTexts", [])
-# stickerForMorning = data.get("stickersForMorning", [])
+data = {}
+sendToSasha = {}
+morningTexts = []
+stickerForMorning = []
 currentMessageToSend = {}
 currentMorningToSend = {}
 
@@ -236,16 +236,34 @@ async def load_message_queue():
     if state:
         global currentMessageToSend, currentMorningToSend, sendToSasha, morningTexts, stickerForMorning
         
-        currentMessageToSend.update(state.get('currentMessageToSend', {}))
-        currentMorningToSend.update(state.get('currentMorningToSend', {}))
+        print("📂 Восстановление состояния сообщений из файла...", flush=True)
         
-        # Восстанавливаем исходные данные, если они не загрузились
-        if not sendToSasha:
-            sendToSasha.update(state.get('sendToSasha', data["sendToSasha"]))
-        if not morningTexts:
-            morningTexts.extend(state.get('morningTexts', data["morningTexts"]))
-        if not stickerForMorning:
-            stickerForMorning.extend(state.get('stickerForMorning', data["stickersForMorning"]))
+        # Восстанавливаем текущие сообщения
+        if state.get('currentMessageToSend'):
+            currentMessageToSend.update(state['currentMessageToSend'])
+            print(f"✅ Восстановлен currentMessageToSend: {currentMessageToSend.get('ID', 'N/A')}", flush=True)
+        
+        if state.get('currentMorningToSend'):
+            currentMorningToSend.update(state['currentMorningToSend'])
+            print(f"✅ Восстановлен currentMorningToSend: {currentMorningToSend.get('ID', 'N/A')}", flush=True)
+        
+        # Восстанавливаем данные только если они не были загружены из исходного файла
+        if state.get('sendToSasha') and not sendToSasha:
+            sendToSasha.update(state['sendToSasha'])
+            print(f"✅ Восстановлен sendToSasha ({len(sendToSasha)} категорий)", flush=True)
+        
+        if state.get('morningTexts') and not morningTexts:
+            morningTexts.extend(state['morningTexts'])
+            print(f"✅ Восстановлен morningTexts ({len(morningTexts)} сообщений)", flush=True)
+        
+        if state.get('stickerForMorning') and not stickerForMorning:
+            stickerForMorning.extend(state['stickerForMorning'])
+            print(f"✅ Восстановлен stickerForMorning ({len(stickerForMorning)} стикеров)", flush=True)
+            
+        if state.get('last_update'):
+            print(f"📅 Состояние обновлено: {state['last_update']}", flush=True)
+    else:
+        print("ℹ️ Нет сохраненного состояния сообщений", flush=True)
 
 # === Функции проверки на случай праздников ===
 
@@ -256,7 +274,6 @@ async def check_and_send_special_day():
 
     special_days = {
         (1, 1): "с новым годом, солнце! так скучаю по тебе, наверное мою лысую голову укрыло слоем снега, смешная картина. пусть этот год начнётся у тебя также хорошо, как заканчивался мой 2025, когда я познакомился с тобой. я раньше и не думал, что котики могут так хорошо выдавать себя за людей...будь счастлива, уже не так много осталось, и если ты ещё ждёшь меня, я обязательно к тебе вернусь. с новым годом, люблю тебя❤️",
-        (11, 2): "с днём рождения, сашенька!❤️ твой день, тебе уже 22, ты уже совсем взрослы котик блин...так надеюсь, что я смогу подарить тебе хоть что-то, но больше всего я хочу тебя увидеть. эгоистично, что подарки в твой день рождения хочу я? ахахах. солнце, ты самая красивое пушистое из семейства кошачьих, на твоём лице хочется видеть только улыбку, которая озоряет своим светом простор. надеюсь, что сейчас, читая этот текст ты улыбаешься. если да, то моя миссия выполнена. ты со всем справишься, ты моя самая большая умничка. люблю тебя❤️",
         (3, 8): "с 8 марта, моя принцесса! надеюсь мы с тобой уже хоть раз увиделись, либо видимся уже сейчас, когда ты это читаешь. сегодня твой день, сегодня я готов сорвать все цветы на полянах, скупить всё в магазнах...ладно, денег нет, на самом деле нарву с могил...шутка! очень надеюсь, что у нас получилось(-ся) встретиться, ведь я так хочу ещё хоть раз тебе подарить букетик и увидеть твою улыбку... 💐",
         (5, 26): "с днём рождения, сашенька!❤️ твой день, тебе уже 22, ты уже совсем взрослы котик блин...так надеюсь, что я смогу подарить тебе хоть что-то, но больше всего я хочу тебя увидеть. эгоистично, что подарки в твой день рождения хочу я? ахахах. солнце, ты самая красивое пушистое из семейства кошачьих, на твоём лице хочется видеть только улыбку, которая озоряет своим светом простор. надеюсь, что сейчас, читая этот текст ты улыбаешься. если да, то моя миссия выполнена. ты со всем справишься, ты моя самая большая умничка. люблю тебя❤️"
     }
@@ -498,7 +515,6 @@ async def schedule_random_morning_message(ID):
  
         # Случайное время — от 8 утра до 12 следующего дня
         deltaTuple = get_time_delta()[0]
-        print(f"deltaTuple={deltaTuple}", flush=True)
         deltaforMorningTexts = timedelta(
             days=int(deltaTuple[0]),
             hours=int(deltaTuple[1]),
@@ -630,34 +646,41 @@ async def validate_and_repair_data():
     """Проверяет и восстанавливает целостность данных"""
     global sendToSasha, morningTexts, stickerForMorning, data
     
+    print("🔍 Проверка целостности данных...", flush=True)
+    
     # Загружаем исходные данные если они пустые
     if not data:
         data = json_load()
     
-    # Проверяем основные данные
+    # Проверяем основные данные и восстанавливаем из исходных если нужно
     if not sendToSasha:
         sendToSasha = data.get("sendToSasha", {})
         print("⚠️ Восстановлены sendToSasha из исходных данных", flush=True)
+    else:
+        print(f"✅ sendToSasha: {len(sendToSasha)} категорий", flush=True)
     
     if not morningTexts:
         morningTexts = data.get("morningTexts", [])
         print("⚠️ Восстановлены morningTexts из исходных данных", flush=True)
+    else:
+        print(f"✅ morningTexts: {len(morningTexts)} сообщений", flush=True)
     
     if not stickerForMorning:
         stickerForMorning = data.get("stickersForMorning", [])
         print("⚠️ Восстановлены stickerForMorning из исходных данных", flush=True)
+    else:
+        print(f"✅ stickerForMorning: {len(stickerForMorning)} стикеров", flush=True)
     
     # Проверяем текущие сообщения
     if currentMessageToSend and not currentMessageToSend.get("ID"):
-        currentMessageToSend.clear()
         print("⚠️ Очищен некорректный currentMessageToSend", flush=True)
+        currentMessageToSend.clear()
     
     if currentMorningToSend and not currentMorningToSend.get("ID"):
-        currentMorningToSend.clear()
         print("⚠️ Очищен некорректный currentMorningToSend", flush=True)
+        currentMorningToSend.clear()
     
-    # Сохраняем исправленные данные
-    await save_message_queue()
+    print("✅ Проверка целостности данных завершена", flush=True)
 
 # === Основной запуск ===
 async def main():
@@ -667,67 +690,71 @@ async def main():
     # 2) Инициализация данных
     global data, sendToSasha, morningTexts, stickerForMorning
     data = json_load()
-    sendToSasha = data.get("sendToSasha", {})
-    morningTexts = data.get("morningTexts", [])
-    stickerForMorning = data.get("stickersForMorning", [])
     
-    print("🔄 Загрузка сохраненного состояния...", flush=True)
-    
-    # 3) Загружаем сохраненное состояние сообщений
+    # 3) Загружаем сохраненное состояние сообщений ПЕРВЫМ делом
+    print("🔄 Загрузка сохраненного состояния сообщений...", flush=True)
     await load_message_queue()
     
-    # 4) Проверяем и восстанавливаем целостность данных
+    # 4) Инициализируем данные, но не перезаписываем восстановленные
+    if not sendToSasha:
+        sendToSasha = data.get("sendToSasha", {})
+    if not morningTexts:
+        morningTexts = data.get("morningTexts", [])
+    if not stickerForMorning:
+        stickerForMorning = data.get("stickersForMorning", [])
+    
+    # 5) Проверяем и восстанавливаем целостность данных
     await validate_and_repair_data()
     
-    # 5) Запускаем HTTP сервер (для Render)
-    port = int(os.getenv("PORT", "8080"))
+    # 6) Запускаем HTTP сервер (для Render)
+    port = int(os.getenv("PORT", "10000"))
     await run_http_server(port)
     
-    # 6) Запускаем планировщик
+    # 7) Запускаем планировщик
     if not scheduler.running:
         scheduler.start()
         print("✅ Планировщик запущен", flush=True)
     
-     # 7) Восстанавливаем задачи планировщика
+    # 8) Восстанавливаем задачи планировщика
     await restore_scheduler_state()
     
-    # 8) Проверяем и создаем задачи если нужно
+    # 9) Проверяем, нужно ли создавать новые задачи
     now = datetime.now(pytz.timezone("Europe/Moscow"))
     
-    # Проверяем задачу random
+    # Проверяем, есть ли активные задачи
     random_job = scheduler.get_job("random")
-    # if not random_job:
-    #     print("🔄 Создание новой задачи random...", flush=True)
-    #     target_id = currentMessageToSend.get("ID", SASHA_ID)
-    #     await schedule_random_message(target_id)
-    # else:
-    #     print(f"✅ Задача random активна, следующее выполнение: {random_job.next_run_time}", flush=True)
-    if random_job:
-        print(f"✅ Задача random активна, следующее выполнение: {random_job.next_run_time}", flush=True)
-    
-        
-    # Проверяем задачу morning  
     morning_job = scheduler.get_job("morning")
-    # if not morning_job:
-    #     print("🔄 Создание новой задачи morning...", flush=True)
-    #     target_id = currentMorningToSend.get("ID", SASHA_ID)
-    #     await schedule_random_morning_message(target_id)
-    # else:
-    #     print(f"✅ Задача morning активна, следующее выполнение: {morning_job.next_run_time}", flush=True)
+    
+    if random_job:
+       print(f"✅ Задача random активна, следующее выполнение: {random_job.next_run_time}", flush=True)
+        
     if morning_job:
         print(f"✅ Задача morning активна, следующее выполнение: {morning_job.next_run_time}", flush=True)
 
-    # 9) Сохраняем начальное состояние
+    
+    # Добавляем ежедневную проверку праздников если её нет
+    if not scheduler.get_job("daily_special_check"):
+        scheduler.add_job(
+            check_and_send_special_day, 
+            "cron", 
+            hour=0, minute=0, 
+            timezone=pytz.timezone("Europe/Moscow"), 
+            id="daily_special_check"
+        )
+        print("✅ Добавлена ежедневная проверка праздников", flush=True)
+    
+    # 10) Сохраняем начальное состояние
     await save_message_queue()
     await save_scheduler_state()
     
-    # 10) Отправляем сообщение о запуске
+    # 11) Отправляем сообщение о запуске
     try:
         await bot.send_message(LOGS_ID, text="🚀 Бот запущен с восстановлением состояния")
+        print("✅ Сообщение о запуске отправлено", flush=True)
     except Exception as e:
         print(f"⚠️ Не удалось отправить сообщение о запуске: {e}", flush=True)
     
-    # 11) Запускаем бота
+    # 12) Запускаем бота
     await bot.delete_webhook(drop_pending_updates=True)
     print("🚀 Start polling...", flush=True)
     
@@ -735,7 +762,6 @@ async def main():
         await dp.start_polling(bot)
     except Exception as e:
         print(f"❌ Ошибка в основном цикле: {e}", flush=True)
-        # Сохраняем состояние при ошибке
         await async_cleanup()
         raise
 
