@@ -234,8 +234,8 @@ async def send_morning_message():
 
 async def schedule_random_message(ID):
     """Планирует отправку в случайную дату/время"""
-    if scheduler.get_jobs("random"):
-        scheduler.remove_job("random")  # очищаем прошлое задание
+    if scheduler.get_jobs(f"random{ID}"):
+        scheduler.remove_job(f"random{ID}")  # очищаем прошлое задание
  
     # Случайное время — от 1 часа до 2 дней вперёд
     deltaforMessages = timedelta(
@@ -282,10 +282,11 @@ async def schedule_random_message(ID):
         currentMessageToSend["text"] = text
     currentMessageToSend["ID"] = ID
     await bot.send_message(LOGS_ID, text=f"❕\tСледующее сообщение:\t❕\nТекст: {currentMessageToSend["text"]}\nФото: {currentMessageToSend["photo"] if "photo" in currentMessageToSend else ""}\nСтикер: {currentMessageToSend["sticker"] if "" in currentMessageToSend else ""}\nПесня: {currentMessageToSend["song"] if "song" in currentMessageToSend else ""}")
-    scheduler.add_job(send_random_message, "date", run_date=run_time, id="random")
+    scheduler.add_job(send_random_message, "date", run_date=run_time, id=f"random{ID}")
     await save_state({
         "next_message_time": run_time.isoformat(),
-        "currentMessageToSend": currentMessageToSend
+        "currentMessageToSend": currentMessageToSend,
+        "ID" : ID
     }, STATE_FILE)
     print(f"❕ Следующее сообщение успешно запланировано на {run_time} ❕", flush=True)
     await bot.send_message(LOGS_ID, text=f"❕ Следующее сообщение успешно запланировано на {run_time} ❕")
@@ -294,8 +295,8 @@ async def schedule_random_message(ID):
 
 async def schedule_random_morning_message(ID):
     """Планирует отправку в случайную дату/время"""
-    if scheduler.get_jobs("morning"):
-        scheduler.remove_job("morning")  # очищаем прошлое задание
+    if scheduler.get_jobs(f"morning{ID}"):
+        scheduler.remove_job(f"morning{ID}")  # очищаем прошлое задание
  
     # Случайное время — от 8 утра до 12 следующего дня
     deltaTuple = get_time_delta()[0]
@@ -317,10 +318,11 @@ async def schedule_random_morning_message(ID):
     currentMorningToSend["sticker"] = choosedsticker
 
     await bot.send_message(LOGS_ID, text=f"❕\tСледующее утреннее сообщение:\t❕\nТекст: {currentMorningToSend["text"]}\nСтикер: {currentMorningToSend["sticker"]}")
-    scheduler.add_job(send_morning_message, "date", run_date=run_time_for_morning_texts, id="morning")
+    scheduler.add_job(send_morning_message, "date", run_date=run_time_for_morning_texts, id=f"morning{ID}")
     await save_state({
         "next_message_time": run_time_for_morning_texts.isoformat(),
-        "currentMessageToSend": currentMorningToSend
+        "currentMessageToSend": currentMorningToSend,
+        "ID" : ID
     }, STATE_FOR_MORNING_FILE)
     print(f"❕ Следующее утреннее сообщение успешно запланировано на {run_time_for_morning_texts} ❕", flush=True)
     await bot.send_message(LOGS_ID, text=f"❕ Следующее утреннее сообщение успешно запланировано на {run_time_for_morning_texts} ❕")
@@ -330,12 +332,12 @@ async def schedule_random_morning_message(ID):
 async def start_cmd(message: types.Message):
     if int(message.from_user.id) == MY_ID or int(message.from_user.id) == SASHA_ID:
         scheduler.start()
-        
+
         await message.answer("ну что ж, если ты это читаешь, саш, то я влип в долги.\nебаный белбет, теперь должен родине...\nно часть моего разума осталась здесь и она с тобой!\nпериодически будет тебе напоминать об одной твари, которая дрочит письки в армии.\nнаслаждайся😈")
         await bot.send_message(LOGS_ID, text=f"✅ Пользователь с ID {message.from_user.id} запустил бота ✅")
         await schedule_random_message(int(message.from_user.id))
         await schedule_random_morning_message(int(message.from_user.id))
-        scheduler.add_job(check_and_send_special_day, "cron", hour=12, minute=40, timezone=pytz.timezone("Europe/Moscow"), id="daily_special_check")
+        scheduler.add_job(check_and_send_special_day, "cron", hour=12, minute=40, timezone=pytz.timezone("Europe/Moscow"), id=f"daily_special_check{message.from_user.id}")
     else:
         await bot.send_message(LOGS_ID, text=f"❌ Пользователь с ID {message.from_user.id} попытался запустить бота ❌")
         await message.answer("ты кто, съебался нахуй, бот не для тебя😡")
@@ -386,7 +388,7 @@ async def main():
             now = datetime.now(pytz.timezone("Europe/Moscow"))
             if run_time > now:
                 # Если время еще не наступило — планируем заново
-                scheduler.add_job(send_random_message, "date", run_date=run_time)
+                scheduler.add_job(send_random_message, "date", run_date=run_time, id=f"random{state["ID"]}")
                 currentMessageToSend.update(state["currentMessageToSend"])
             else:
                 # Если время прошло — сразу отправляем
@@ -405,7 +407,7 @@ async def main():
             now = datetime.now(pytz.timezone("Europe/Moscow"))
             if run_time > now:
                 # Если время еще не наступило — планируем заново
-                scheduler.add_job(send_morning_message, "date", run_date=run_time, id="morning")
+                scheduler.add_job(send_morning_message, "date", run_date=run_time, id=f"morning{state["ID"]}")
                 currentMorningToSend.update(state_of_morning_message["currentMorningToSend"])
             else:
                 # Если время прошло — сразу отправляем
