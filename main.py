@@ -442,9 +442,9 @@ async def schedule_random_message(ID):
  
         # Случайное время — от 1 часа до 2 дней вперёд
         deltaforMessages = timedelta(
-            days=0,
-            hours=0,
-            minutes=5
+            days=random.randint(0, 1),
+            hours=random.randint(0, 23),
+            minutes=random.randint(0, 60)
         )
 
         run_time = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMessages
