@@ -533,7 +533,6 @@ async def schedule_random_morning_message(ID):
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
     if int(message.from_user.id) == MY_ID or int(message.from_user.id) == SASHA_ID:
-        scheduler.start()
         currentMessageToSend["ID"] = message.from_user.id
         currentMorningToSend["ID"] = message.from_user.id
         await message.answer("ну что ж, если ты это читаешь, саш, то я влип в долги.\nебаный белбет, теперь должен родине...\nно часть моего разума осталась здесь и она с тобой!\nпериодически будет тебе напоминать об одной твари, которая дрочит письки в армии.\nнаслаждайся😈")
