@@ -3,6 +3,8 @@ import os
 import random
 import pytz
 import json
+import signal
+import atexit
 
 from datetime import datetime, timedelta
 from aiohttp import web
@@ -21,7 +23,8 @@ STATE_DIR ="json"
 STATE_FILE = os.path.join(STATE_DIR, "state.json")
 TEXT_FILE = os.path.join(STATE_DIR, "texts.json")
 STATE_FOR_MORNING_FILE = os.path.join(STATE_DIR, "state_for_morning.json")
-
+SCHEDULER_STATE_FILE = os.path.join(STATE_DIR, "scheduler_state.json")
+STATE_OF_OBJECTS = os.path.join(STATE_DIR, "state_of_objects.json")
 WEBHOOK_HOST = "https://sasha-bot-lwjs.onrender.com"  # 🌐 Укажи свой домен (https обязательно!)
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
@@ -32,23 +35,21 @@ scheduler = AsyncIOScheduler()
 
 # === Функция выгрузки сообщений из JSON ===
 def json_load():
-    
-      with open(TEXT_FILE, 'r') as file:
-            
-            try:
-                data = json.load(file)
-                # await bot.send_message(LOGS_ID, text="✅ Сообщения успешно распакованы из JSON ✅")
-                print("✅ Сообщения успешно распакованы из JSON ✅", flush=True)
-                return data
-            except Exception as e:
-                # bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️")
-                print(f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️", flush=True)
+    try:
+      with open(TEXT_FILE, 'r') as file:    
+        data = json.load(file)
+        # await bot.send_message(LOGS_ID, text="✅ Сообщения успешно распакованы из JSON ✅")
+        print("✅ Сообщения успешно распакованы из JSON ✅", flush=True)
+        return data
+    except Exception as e:
+        # bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️")
+        print(f"⚠️ Ошибка при распаковке сообщений из JSON: {e} ⚠️", flush=True)
                 
 # === Объекты с данными ===
 data = json_load()
-sendToSasha = data["sendToSasha"]
-morningTexts = data["morningTexts"]
-stickerForMorning = data["stickersForMorning"]
+sendToSasha = data.get("sendToSasha", {})
+morningTexts = data.get("morningTexts", [])
+stickerForMorning = data.get("stickersForMorning", [])
 currentMessageToSend = {}
 currentMorningToSend = {}
 
@@ -59,7 +60,8 @@ async def save_state(data: dict, file):
         os.makedirs(STATE_DIR, exist_ok=True)
         with open(file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        await bot.send_message(LOGS_ID, text="❕Запланированное сообщение успешно сохранено в память❕")
+        print(f"✅ Состояние сохранено в {file}", flush=True)
+        await bot.send_message(LOGS_ID, text=f"❕Запланированное сообщение успешно сохранено в {file}❕")
         
     except Exception as e:
         print(f"⚠️ Ошибка при сохранении состояния: {e}", flush=True)
@@ -75,6 +77,71 @@ async def load_state(file) -> dict:
         print(f"⚠️ Ошибка при загрузке запланированного сообщения из памяти: {e}", flush=True)
         await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при загрузке запланированного сообщения из памяти: {e}")
     return {}
+
+# === Функция сохранения состояния планировщика ===
+
+async def save_scheduler_state():
+    """Сохраняет состояние планировщика"""
+    jobs_data = []
+    for job in scheduler.get_jobs():
+        jobs_data.append({
+            'id': job.id,
+            'next_run_time': job.next_run_time.isoformat() if job.next_run_time else None,
+            'func': job.func.__name__ if hasattr(job.func, '__name__') else str(job.func)
+        })
+    
+    await save_state({'jobs': jobs_data}, SCHEDULER_STATE_FILE)
+
+# === Функция восстановления состояния планировщика ===
+
+async def restore_scheduler_state():
+    """Восстанавливает состояние планировщика"""
+    state = await load_state(SCHEDULER_STATE_FILE)
+    if not state or 'jobs' not in state:
+        return
+    
+    for job_data in state['jobs']:
+        if job_data['func'] == 'send_random_message':
+            run_time = datetime.fromisoformat(job_data['next_run_time'])
+            if run_time > datetime.now(pytz.timezone("Europe/Moscow")):
+                scheduler.add_job(send_random_message, "date", run_date=run_time, id=job_data['id'])
+        elif job_data['func'] == 'send_morning_message':
+            run_time = datetime.fromisoformat(job_data['next_run_time'])
+            if run_time > datetime.now(pytz.timezone("Europe/Moscow")):
+                scheduler.add_job(send_morning_message, "date", run_date=run_time, id=job_data['id'])
+
+# === Функция сохранения очереди сообщений ===
+
+async def save_message_queue():
+    """Сохраняет всю очередь сообщений"""
+    message_state = {
+        'currentMessageToSend': currentMessageToSend,
+        'currentMorningToSend': currentMorningToSend,
+        'sendToSasha': sendToSasha,
+        'morningTexts': morningTexts,
+        'stickerForMorning': stickerForMorning,
+        'last_update': datetime.now(pytz.timezone("Europe/Moscow")).isoformat()
+    }
+    await save_state(message_state, STATE_FILE)
+
+# === Функция загрузки очереди сообщений ===
+
+async def load_message_queue():
+    """Загружает всю очередь сообщений"""
+    state = await load_state(STATE_FILE)
+    if state:
+        global currentMessageToSend, currentMorningToSend, sendToSasha, morningTexts, stickerForMorning
+        
+        currentMessageToSend.update(state.get('currentMessageToSend', {}))
+        currentMorningToSend.update(state.get('currentMorningToSend', {}))
+        
+        # Восстанавливаем исходные данные, если они не загрузились
+        if not sendToSasha:
+            sendToSasha.update(state.get('sendToSasha', data["sendToSasha"]))
+        if not morningTexts:
+            morningTexts.extend(state.get('morningTexts', data["morningTexts"]))
+        if not stickerForMorning:
+            stickerForMorning.extend(state.get('stickerForMorning', data["stickersForMorning"]))
 
 # === Функции проверки на случай праздников ===
 
@@ -118,114 +185,126 @@ def get_time_delta():
 # === Функция случайной рассылки ===
 
 async def send_random_message():
-    is_sent = 0
-    total_to_sent = len(currentMessageToSend.keys()) - 1
-
     try:
-        if "song" in currentMessageToSend:
-            await bot.send_audio(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["song"]), caption=currentMessageToSend["text"])
-            await bot.send_audio(GROUP_ID, FSInputFile(currentMessageToSend["song"]), caption=currentMessageToSend["text"])
-            del currentMessageToSend["text"]
-            del currentMessageToSend["song"]
-            is_sent += 2
-    except Exception as e:
-        await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке песни с текстом: {e} ⚠️")
+        is_sent = 0
+        total_to_sent = len(currentMessageToSend.keys()) - 1
 
-    try:
-        if "photo" in currentMessageToSend:
-                await bot.send_photo(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
-                await bot.send_photo(GROUP_ID, FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
+        try:
+            if "song" in currentMessageToSend:
+                await bot.send_audio(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["song"]), caption=currentMessageToSend["text"])
+                await bot.send_audio(GROUP_ID, FSInputFile(currentMessageToSend["song"]), caption=currentMessageToSend["text"])
                 del currentMessageToSend["text"]
-                del currentMessageToSend["photo"]
+                del currentMessageToSend["song"]
                 is_sent += 2
-    except Exception as e:
-        await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке фото с текстом: {e} ⚠️")
+        except Exception as e:
+            await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке песни с текстом: {e} ⚠️")
 
-    try:    
-        if "text" in currentMessageToSend:
-                await bot.send_message(currentMessageToSend["ID"], text=currentMessageToSend["text"])
-                await bot.send_message(GROUP_ID, text=currentMessageToSend["text"])
-                del currentMessageToSend["text"]
-                is_sent += 1
-    except Exception as e:
-        await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке текста: {e} ⚠️")
+        try:
+            if "photo" in currentMessageToSend:
+                    await bot.send_photo(currentMessageToSend["ID"], FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
+                    await bot.send_photo(GROUP_ID, FSInputFile(currentMessageToSend["photo"]), caption=currentMessageToSend["text"])
+                    del currentMessageToSend["text"]
+                    del currentMessageToSend["photo"]
+                    is_sent += 2
+        except Exception as e:
+            await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке фото с текстом: {e} ⚠️")
 
-    try:        
-        if "sticker" in currentMessageToSend:
-                await bot.send_sticker(currentMessageToSend["ID"], sticker=currentMessageToSend["sticker"])
-                await bot.send_sticker(GROUP_ID, sticker=currentMessageToSend["sticker"])
-                del currentMessageToSend["sticker"]
-                is_sent += 1
-    except Exception as e:
-        await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке стикера: {e} ⚠️")
-  
-    if is_sent == total_to_sent:
-        print(f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение успешно отправлено ✅", flush=True)
-        await bot.send_message(LOGS_ID, text=f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение успешно отправлено ✅")
-        os.remove(STATE_FILE)
-    else:
-        if is_sent == 0:
-            print(f"❌❌❌ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение не было отправлено ❌❌❌", flush=True)
-            await bot.send_message(LOGS_ID, text=f"❌❌❌ [{datetime.now()}] Сообщение не было отправлено ❌❌❌")
-        else:
-            print(f"✅⚠️ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение было отправлено с ошибкой ✅⚠️", flush=True)
-            await bot.send_message(LOGS_ID, text=f"✅⚠️ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение было отправлено с ошибкой ✅⚠️")
+        try:    
+            if "text" in currentMessageToSend:
+                    await bot.send_message(currentMessageToSend["ID"], text=currentMessageToSend["text"])
+                    await bot.send_message(GROUP_ID, text=currentMessageToSend["text"])
+                    del currentMessageToSend["text"]
+                    is_sent += 1
+        except Exception as e:
+            await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке текста: {e} ⚠️")
+
+        try:        
+            if "sticker" in currentMessageToSend:
+                    await bot.send_sticker(currentMessageToSend["ID"], sticker=currentMessageToSend["sticker"])
+                    await bot.send_sticker(GROUP_ID, sticker=currentMessageToSend["sticker"])
+                    del currentMessageToSend["sticker"]
+                    is_sent += 1
+        except Exception as e:
+            await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке стикера: {e} ⚠️")
+    
+        if is_sent == total_to_sent:
+            print(f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение успешно отправлено ✅", flush=True)
+            await bot.send_message(LOGS_ID, text=f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение успешно отправлено ✅")
             os.remove(STATE_FILE)
+        else:
+            if is_sent == 0:
+                print(f"❌❌❌ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение не было отправлено ❌❌❌", flush=True)
+                await bot.send_message(LOGS_ID, text=f"❌❌❌ [{datetime.now()}] Сообщение не было отправлено ❌❌❌")
+            else:
+                print(f"✅⚠️ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение было отправлено с ошибкой ✅⚠️", flush=True)
+                await bot.send_message(LOGS_ID, text=f"✅⚠️ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Сообщение было отправлено с ошибкой ✅⚠️")
+                os.remove(STATE_FILE)
 
-    if "song" in currentMessageToSend:
-        del currentMessageToSend["song"]        
-    if "sticker" in currentMessageToSend:
-        del currentMessageToSend["sticker"]
-    if "text" in currentMessageToSend:
-        del currentMessageToSend["text"]
-    if "photo" in currentMessageToSend:
-        del currentMessageToSend["photo"]
-       
+        if "song" in currentMessageToSend:
+            del currentMessageToSend["song"]        
+        if "sticker" in currentMessageToSend:
+            del currentMessageToSend["sticker"]
+        if "text" in currentMessageToSend:
+            del currentMessageToSend["text"]
+        if "photo" in currentMessageToSend:
+            del currentMessageToSend["photo"]
+        # Сохраняем очередь и планировщика  
+        await save_message_queue()
+        await save_scheduler_state()
+    except Exception as e:
+        print(f"❌ Ошибка при отправке сообщения: {e}", flush=True)
+        await bot.send_message(LOGS_ID, text=f"❌ Ошибка при отправке сообщения: {e}")   
     # Планируем следующее случайное время отправки
     await schedule_random_message(currentMessageToSend["ID"])
 
 # === Функция утренней рассылки ===
 
 async def send_morning_message():
-    is_sent = 0
-    total_to_sent = len(currentMorningToSend.keys()) - 1
+    try:
+        is_sent = 0
+        total_to_sent = len(currentMorningToSend.keys()) - 1
 
-    try:    
-        if "text" in currentMorningToSend:
-                await bot.send_message(currentMorningToSend["ID"], text=currentMorningToSend["text"])
-                await bot.send_message(GROUP_ID, text=currentMorningToSend["text"])
-                del currentMorningToSend["text"]
-                is_sent += 1
-    except Exception as e:
-        await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке утреннего сообщения: {e} ⚠️")
+        try:    
+            if "text" in currentMorningToSend:
+                    await bot.send_message(currentMorningToSend["ID"], text=currentMorningToSend["text"])
+                    await bot.send_message(GROUP_ID, text=currentMorningToSend["text"])
+                    del currentMorningToSend["text"]
+                    is_sent += 1
+        except Exception as e:
+            await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке утреннего сообщения: {e} ⚠️")
 
-    try:        
-        if "sticker" in currentMorningToSend:
-                await bot.send_sticker(currentMorningToSend["ID"], sticker=currentMorningToSend["sticker"])
-                await bot.send_sticker(GROUP_ID, sticker=currentMorningToSend["sticker"])
-                del currentMorningToSend["sticker"]
-                is_sent += 1
-    except Exception as e:
-        await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке стикера в утреннем сообщении: {e} ⚠️")
-  
-    if is_sent == total_to_sent:
-        print(f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Утреннее сообщение успешно отправлено ✅", flush=True)
-        await bot.send_message(LOGS_ID, text=f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Утреннее сообщение успешно отправлено ✅")
-        os.remove(STATE_FOR_MORNING_FILE)
-    else:
-        if is_sent == 0:
-            print(f"❌❌❌ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Утреннее сообщение не было отправлено ❌❌❌", flush=True)
-            await bot.send_message(LOGS_ID, text=f"❌❌❌ [{datetime.now()}] Утреннее сообщение не было отправлено ❌❌❌")
-        else:
-            print(f"✅⚠️ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Утреннее сообщение было отправлено с ошибкой ✅⚠️", flush=True)
-            await bot.send_message(LOGS_ID, text=f"✅⚠️ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Утреннее сообщение было отправлено с ошибкой ✅⚠️")
+        try:        
+            if "sticker" in currentMorningToSend:
+                    await bot.send_sticker(currentMorningToSend["ID"], sticker=currentMorningToSend["sticker"])
+                    await bot.send_sticker(GROUP_ID, sticker=currentMorningToSend["sticker"])
+                    del currentMorningToSend["sticker"]
+                    is_sent += 1
+        except Exception as e:
+            await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при отправке стикера в утреннем сообщении: {e} ⚠️")
+    
+        if is_sent == total_to_sent:
+            print(f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Утреннее сообщение успешно отправлено ✅", flush=True)
+            await bot.send_message(LOGS_ID, text=f"✅ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Утреннее сообщение успешно отправлено ✅")
             os.remove(STATE_FOR_MORNING_FILE)
+        else:
+            if is_sent == 0:
+                print(f"❌❌❌ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Утреннее сообщение не было отправлено ❌❌❌", flush=True)
+                await bot.send_message(LOGS_ID, text=f"❌❌❌ [{datetime.now()}] Утреннее сообщение не было отправлено ❌❌❌")
+            else:
+                print(f"✅⚠️ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Утреннее сообщение было отправлено с ошибкой ✅⚠️", flush=True)
+                await bot.send_message(LOGS_ID, text=f"✅⚠️ [{datetime.now(pytz.timezone("Europe/Moscow"))}] Утреннее сообщение было отправлено с ошибкой ✅⚠️")
+                os.remove(STATE_FOR_MORNING_FILE)
 
-    if "sticker" in currentMorningToSend:
-        del currentMorningToSend["sticker"]
-    if "text" in currentMorningToSend:
-        del currentMorningToSend["text"]
-
+        if "sticker" in currentMorningToSend:
+            del currentMorningToSend["sticker"]
+        if "text" in currentMorningToSend:
+            del currentMorningToSend["text"]
+     # Сохраняем очередь и планировщика  
+        await save_message_queue()
+        await save_scheduler_state()
+    except Exception as e:
+        print(f"❌ Ошибка при отправке утреннего сообщения: {e}", flush=True)
+        await bot.send_message(LOGS_ID, text=f"❌ Ошибка при отправке утреннего сообщения: {e}")   
        
     # Планируем следующее случайное время отправки
     await schedule_random_morning_message(currentMorningToSend["ID"])
@@ -233,101 +312,115 @@ async def send_morning_message():
 # === Функция случайного времени сообщения ===
 
 async def schedule_random_message(ID):
-    """Планирует отправку в случайную дату/время"""
-    if scheduler.get_jobs("random"):
-        scheduler.remove_job("random")  # очищаем прошлое задание
- 
-    # Случайное время — от 1 часа до 2 дней вперёд
-    deltaforMessages = timedelta(
-        days=0,
-        hours=0,
-        minutes=5
-        # days=random.randint(0, 7),
-        # hours=random.randint(0, 23),
-        # minutes=random.randint(0, 59)
-    )
+    try:
+        """Планирует отправку в случайную дату/время"""
+        if scheduler.get_jobs("random"):
+            scheduler.remove_job("random")  # очищаем прошлое задание
+    
+        # Случайное время — от 1 часа до 2 дней вперёд
+        deltaforMessages = timedelta(
+            days=0,
+            hours=0,
+            minutes=5
+            # days=random.randint(0, 7),
+            # hours=random.randint(0, 23),
+            # minutes=random.randint(0, 59)
+        )
 
-    run_time = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMessages
-    message = random.choice(list(sendToSasha.keys()))
-    while (message != "withSong" and len(sendToSasha[message]["texts"]) == 0) or (message == "withSong" and len(sendToSasha[message]["songs"]) == 0):
-            print(f"⚠️ Закончились строки {sendToSasha[message]}", flush=True)
-            await bot.send_message(LOGS_ID, text=f"⚠️ Закончились строки {message}")
-            del sendToSasha[message]
-            message = random.choice(list(sendToSasha.keys()))
+        run_time = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMessages
+        message = random.choice(list(sendToSasha.keys()))
+        while (message != "withSong" and len(sendToSasha[message]["texts"]) == 0) or (message == "withSong" and len(sendToSasha[message]["songs"]) == 0):
+                print(f"⚠️ Закончились строки {sendToSasha[message]}", flush=True)
+                await bot.send_message(LOGS_ID, text=f"⚠️ Закончились строки {message}")
+                del sendToSasha[message]
+                message = random.choice(list(sendToSasha.keys()))
 
-    if message == "withSong":
-        try:
-            print(f"Сообщение будет отправлено с песней.", flush=True)
-            currentMessageToSend["song"] = random.choice(list(sendToSasha[message]["songs"].keys()))
-            currentMessageToSend["text"] = sendToSasha[message]["songs"][currentMessageToSend["song"]]
-            del sendToSasha[message]["songs"][currentMessageToSend["song"]]
-        except Exception as e:
-            print(f"⚠️ Ошибка при выборе песни: {e}", flush=True)
-            await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при выборе песни: {e}")
-    else:
-        text = random.choice(sendToSasha[message]["texts"])
-        sendToSasha[message]["texts"].remove(text)
-        if random.choice(sendToSasha[message]["withPhoto"]) == 1:
+        if message == "withSong":
             try:
-                print(f"Сообщение будет отправлено с фото.", flush=True)   
-                currentMessageToSend["photo"] = random.choice(sendToSasha[message]["photos"])
-                sendToSasha[message]["photos"].remove(currentMessageToSend["photo"])
+                print(f"Сообщение будет отправлено с песней.", flush=True)
+                currentMessageToSend["song"] = random.choice(list(sendToSasha[message]["songs"].keys()))
+                currentMessageToSend["text"] = sendToSasha[message]["songs"][currentMessageToSend["song"]]
+                del sendToSasha[message]["songs"][currentMessageToSend["song"]]
             except Exception as e:
-                print(f"⚠️ Ошибка при выборе фото: {e}", flush=True)
-                await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при выборе фото: {e}")
-        if random.choice(sendToSasha[message]["withSticker"]) == 1:
-            try:
-                print(f"Сообщение будет отправлено со стикером.", flush=True)
-                currentMessageToSend["sticker"] = random.choice(sendToSasha[message]["stickers"])
-            except Exception as e:
-                print(f"⚠️ Ошибка при выборе стикера: {e}", flush=True)
-                await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при выборе стикера: {e}")
-        currentMessageToSend["text"] = text
-    currentMessageToSend["ID"] = ID
-    await bot.send_message(LOGS_ID, text=f"❕\tСледующее сообщение:\t❕\nТекст: {currentMessageToSend["text"]}\nФото: {currentMessageToSend["photo"] if "photo" in currentMessageToSend else ""}\nСтикер: {currentMessageToSend["sticker"] if "" in currentMessageToSend else ""}\nПесня: {currentMessageToSend["song"] if "song" in currentMessageToSend else ""}")
-    scheduler.add_job(send_random_message, "date", run_date=run_time, id="random")
-    await save_state({
-        "next_message_time": run_time.isoformat(),
-        "currentMessageToSend": currentMessageToSend
-    }, STATE_FILE)
-    print(f"❕ Следующее сообщение успешно запланировано на {run_time} ❕", flush=True)
-    await bot.send_message(LOGS_ID, text=f"❕ Следующее сообщение успешно запланировано на {run_time} ❕")
-
+                print(f"⚠️ Ошибка при выборе песни: {e}", flush=True)
+                await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при выборе песни: {e}")
+        else:
+            text = random.choice(sendToSasha[message]["texts"])
+            sendToSasha[message]["texts"].remove(text)
+            if random.choice(sendToSasha[message]["withPhoto"]) == 1:
+                try:
+                    print(f"Сообщение будет отправлено с фото.", flush=True)   
+                    currentMessageToSend["photo"] = random.choice(sendToSasha[message]["photos"])
+                    sendToSasha[message]["photos"].remove(currentMessageToSend["photo"])
+                except Exception as e:
+                    print(f"⚠️ Ошибка при выборе фото: {e}", flush=True)
+                    await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при выборе фото: {e}")
+            if random.choice(sendToSasha[message]["withSticker"]) == 1:
+                try:
+                    print(f"Сообщение будет отправлено со стикером.", flush=True)
+                    currentMessageToSend["sticker"] = random.choice(sendToSasha[message]["stickers"])
+                except Exception as e:
+                    print(f"⚠️ Ошибка при выборе стикера: {e}", flush=True)
+                    await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при выборе стикера: {e}")
+            currentMessageToSend["text"] = text
+        currentMessageToSend["ID"] = ID
+        await bot.send_message(LOGS_ID, text=f"❕\tСледующее сообщение:\t❕\nТекст: {currentMessageToSend["text"]}\nФото: {currentMessageToSend["photo"] if "photo" in currentMessageToSend else ""}\nСтикер: {currentMessageToSend["sticker"] if "" in currentMessageToSend else ""}\nПесня: {currentMessageToSend["song"] if "song" in currentMessageToSend else ""}")
+        scheduler.add_job(send_random_message, "date", run_date=run_time, id="random")
+        await save_state({
+            "next_message_time": run_time.isoformat(),
+            "currentMessageToSend": currentMessageToSend
+        }, STATE_FILE)
+        print(f"❕ Следующее сообщение успешно запланировано на {run_time} ❕", flush=True)
+        await bot.send_message(LOGS_ID, text=f"❕ Следующее сообщение успешно запланировано на {run_time} ❕")
+     # Сохраняем очередь и планировщика  
+        await save_message_queue()
+        await save_scheduler_state()
+    except Exception as e:
+        print(f"❌ Ошибка при планировании сообщения: {e}", flush=True)
+        await bot.send_message(LOGS_ID, text=f"❌ Ошибка при планировании сообщения: {e}")   
+       
 # === Функция случайного времени утреннего сообщения ===
 
 async def schedule_random_morning_message(ID):
-    """Планирует отправку в случайную дату/время"""
-    if scheduler.get_jobs("morning"):
-        scheduler.remove_job("morning")  # очищаем прошлое задание
- 
-    # Случайное время — от 8 утра до 12 следующего дня
-    deltaTuple = get_time_delta()[0]
-    print(f"deltaTuple={deltaTuple}", flush=True)
-    deltaforMorningTexts = timedelta(
-        days=int(deltaTuple[0]),
-        hours=int(deltaTuple[1]),
-        minutes=int(deltaTuple[2])
-    )
-    run_time_for_morning_texts = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMorningTexts
-    print("MORNING", flush=True)
+    try:
+        """Планирует отправку в случайную дату/время"""
+        if scheduler.get_jobs("morning"):
+            scheduler.remove_job("morning")  # очищаем прошлое задание
     
-    text = random.choice(morningTexts)
-    morningTexts.remove(text)
-    choosedsticker = random.choice(stickerForMorning)
-    print(f"MORNING", flush=True)
-    currentMorningToSend["text"] = text
-    currentMorningToSend["ID"] = ID
-    currentMorningToSend["sticker"] = choosedsticker
+        # Случайное время — от 8 утра до 12 следующего дня
+        deltaTuple = get_time_delta()[0]
+        print(f"deltaTuple={deltaTuple}", flush=True)
+        deltaforMorningTexts = timedelta(
+            days=int(deltaTuple[0]),
+            hours=int(deltaTuple[1]),
+            minutes=int(deltaTuple[2])
+        )
+        run_time_for_morning_texts = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMorningTexts
+        print("MORNING", flush=True)
+        
+        text = random.choice(morningTexts)
+        morningTexts.remove(text)
+        choosedsticker = random.choice(stickerForMorning)
+        print(f"MORNING", flush=True)
+        currentMorningToSend["text"] = text
+        currentMorningToSend["ID"] = ID
+        currentMorningToSend["sticker"] = choosedsticker
 
-    await bot.send_message(LOGS_ID, text=f"❕\tСледующее утреннее сообщение:\t❕\nТекст: {currentMorningToSend["text"]}\nСтикер: {currentMorningToSend["sticker"]}")
-    scheduler.add_job(send_morning_message, "date", run_date=run_time_for_morning_texts, id="morning")
-    await save_state({
-        "next_message_time": run_time_for_morning_texts.isoformat(),
-        "currentMessageToSend": currentMorningToSend
-    }, STATE_FOR_MORNING_FILE)
-    print(f"❕ Следующее утреннее сообщение успешно запланировано на {run_time_for_morning_texts} ❕", flush=True)
-    await bot.send_message(LOGS_ID, text=f"❕ Следующее утреннее сообщение успешно запланировано на {run_time_for_morning_texts} ❕")
-
+        await bot.send_message(LOGS_ID, text=f"❕\tСледующее утреннее сообщение:\t❕\nТекст: {currentMorningToSend["text"]}\nСтикер: {currentMorningToSend["sticker"]}")
+        scheduler.add_job(send_morning_message, "date", run_date=run_time_for_morning_texts, id="morning")
+        await save_state({
+            "next_message_time": run_time_for_morning_texts.isoformat(),
+            "currentMessageToSend": currentMorningToSend
+        }, STATE_FOR_MORNING_FILE)
+        print(f"❕ Следующее утреннее сообщение успешно запланировано на {run_time_for_morning_texts} ❕", flush=True)
+        await bot.send_message(LOGS_ID, text=f"❕ Следующее утреннее сообщение успешно запланировано на {run_time_for_morning_texts} ❕")
+    # Сохраняем очередь и планировщика  
+        await save_message_queue()
+        await save_scheduler_state()
+    except Exception as e:
+        print(f"❌ Ошибка при планировании утреннего сообщения: {e}", flush=True)
+        await bot.send_message(LOGS_ID, text=f"❌ Ошибка при планировании утреннего сообщения: {e}")   
+       
 # === Обработчики команд и сообщений ===
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
@@ -338,7 +431,7 @@ async def start_cmd(message: types.Message):
         await bot.send_message(LOGS_ID, text=f"✅ Пользователь с ID {message.from_user.id} запустил бота ✅")
         await schedule_random_message(int(message.from_user.id))
         await schedule_random_morning_message(int(message.from_user.id))
-        scheduler.add_job(check_and_send_special_day, "cron", hour=0, minute=0, timezone=pytz.timezone("Europe/Moscow"), id="daily_special_check")
+        scheduler.add_job(check_and_send_special_day, "cron", hour=12, minute=40, timezone=pytz.timezone("Europe/Moscow"), id="daily_special_check")
     else:
         await bot.send_message(LOGS_ID, text=f"❌ Пользователь с ID {message.from_user.id} попытался запустить бота ❌")
         await message.answer("ты кто, съебался нахуй, бот не для тебя😡")
@@ -363,9 +456,10 @@ async def echo_msg(message: types.Message):
 async def run_http_server(port: int):
     async def handle_root(request):
         return web.Response(text="✅ OK")
-
+    async def handle_health(request):
+        return web.json_response({"status": "ok", "timestamp": datetime.now().isoformat()})
     app = web.Application()
-    app.add_routes([web.get("/", handle_root)])
+    app.add_routes([web.get("/", handle_root), web.get("/health", handle_health)])
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", port)
@@ -373,58 +467,176 @@ async def run_http_server(port: int):
     print(f"❕ HTTP server started on 0.0.0.0:{port} ❕", flush=True)
     await bot.send_message(LOGS_ID, text=f"❕ HTTP server started on 0.0.0.0:{port} ❕")
 
+def setup_cleanup():
+    """Настройка обработчиков для корректного завершения"""
+    async def cleanup():
+        print("💾 Сохранение состояния перед завершением...", flush=True)
+        await save_message_queue()
+        await save_scheduler_state()
+        if scheduler.running:
+            scheduler.shutdown()
+        print("✅ Состояние сохранено, планировщик остановлен", flush=True)
+    
+    def signal_handler(signum, frame):
+        print(f"📞 Получен сигнал {signum}, сохраняем состояние...", flush=True)
+        asyncio.create_task(cleanup())
+    
+    # Регистрируем обработчики сигналов (только на Linux/Mac)
+    try:
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+    except (AttributeError, ValueError):
+        print("⚠️ Сигналы не поддерживаются на этой платформе", flush=True)
+    
+    # Регистрируем обработчик при выходе
+    atexit.register(lambda: asyncio.run(cleanup()))
+
+async def validate_and_repair_data():
+    """Проверяет и восстанавливает целостность данных"""
+    global sendToSasha, morningTexts, stickerForMorning, data
+    
+    # Загружаем исходные данные если они пустые
+    if not data:
+        data = json_load()
+    
+    # Проверяем основные данные
+    if not sendToSasha:
+        sendToSasha = data.get("sendToSasha", {})
+        print("⚠️ Восстановлены sendToSasha из исходных данных", flush=True)
+    
+    if not morningTexts:
+        morningTexts = data.get("morningTexts", [])
+        print("⚠️ Восстановлены morningTexts из исходных данных", flush=True)
+    
+    if not stickerForMorning:
+        stickerForMorning = data.get("stickersForMorning", [])
+        print("⚠️ Восстановлены stickerForMorning из исходных данных", flush=True)
+    
+    # Проверяем текущие сообщения
+    if currentMessageToSend and not currentMessageToSend.get("ID"):
+        currentMessageToSend.clear()
+        print("⚠️ Очищен некорректный currentMessageToSend", flush=True)
+    
+    if currentMorningToSend and not currentMorningToSend.get("ID"):
+        currentMorningToSend.clear()
+        print("⚠️ Очищен некорректный currentMorningToSend", flush=True)
+    
+    # Сохраняем исправленные данные
+    await save_message_queue()
 
 # === Основной запуск ===
 async def main():
-
-    # 1) запускаем локальный HTTP-сервер на PORT (чтобы Render увидел открытый порт)
+   # 1) Настройка обработчиков для корректного завершения
+    setup_cleanup()
+    
+    # 2) Инициализация данных
+    global data, sendToSasha, morningTexts, stickerForMorning
+    data = json_load()
+    sendToSasha = data.get("sendToSasha", {})
+    morningTexts = data.get("morningTexts", [])
+    stickerForMorning = data.get("stickersForMorning", [])
+    
+    print("🔄 Загрузка сохраненного состояния...", flush=True)
+    await bot.send_message(LOGS_ID, text="🔄 Загрузка сохраненного состояния...")
+    
+    # 3) Загружаем сохраненное состояние
+    await load_message_queue()
+    await restore_scheduler_state()
+    
+    # 4) Проверяем и восстанавливаем целостность данных
+    await validate_and_repair_data()
+    
+    # 5) Запускаем HTTP сервер (для Render)
     port = int(os.getenv("PORT", "8080"))
     await run_http_server(port)
-
-    # 2) проверяем наличие сообщений в очереди
-    state = await load_state(STATE_FILE)
-    if state and "next_message_time" in state:
-        try:
-            run_time = datetime.fromisoformat(state["next_message_time"])
-            now = datetime.now(pytz.timezone("Europe/Moscow"))
-            if run_time > now:
-                # Если время еще не наступило — планируем заново
-                scheduler.add_job(send_random_message, "date", run_date=run_time)
-                currentMessageToSend.update(state["currentMessageToSend"])
+    
+    # 6) Восстанавливаем планировщик если нет активных задач
+    if not scheduler.get_jobs():
+        print("🔄 Восстановление планировщика...", flush=True)
+        await bot.send_message(LOGS_ID, text="🔄 Восстановление планировщика...")
+        
+        # Проверяем есть ли сообщения в очереди, которые нужно отправить
+        now = datetime.now(pytz.timezone("Europe/Moscow"))
+        
+        # Восстанавливаем обычные сообщения
+        if currentMessageToSend and currentMessageToSend.get("ID"):
+            state = await load_state(STATE_FILE)
+            if state and "next_message_time" in state:
+                run_time = datetime.fromisoformat(state["next_message_time"])
+                if run_time > now:
+                    # Время еще не наступило - перепланируем
+                    scheduler.add_job(send_random_message, "date", run_date=run_time, id="random")
+                    print(f"♻️ Восстановлено запланированное сообщение на {run_time}", flush=True)
+                    await bot.send_message(LOGS_ID, text=f"♻️ Восстановлено запланированное сообщение на {run_time}")
+                else:
+                    # Время прошло - отправляем сразу
+                    print("⏰ Время сообщения прошло, отправляем сейчас...", flush=True)
+                    await bot.send_message(LOGS_ID, text="⏰ Время сообщения прошло, отправляем сейчас...")
+                    asyncio.create_task(send_random_message())
             else:
-                # Если время прошло — сразу отправляем
-                currentMessageToSend.update(state["currentMessageToSend"])
-                await send_random_message()
-            print(f"♻️ Восстановлено запланированное сообщение на {run_time}", flush=True)
-            await bot.send_message(LOGS_ID, text=f"♻️ Восстановлено запланированное сообщение на {run_time}")
-        except Exception as e:
-            print(f"⚠️ Ошибка при восстановлении очереди сообщений: {e}", flush=True)
-            await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при восстановлении очереди сообщений: {e}")
-
-    state_of_morning_message = await load_state(STATE_FOR_MORNING_FILE)
-    if state_of_morning_message and "next_message_time" in state:
-        try:
-            run_time = datetime.fromisoformat(state_of_morning_message["next_message_time"])
-            now = datetime.now(pytz.timezone("Europe/Moscow"))
-            if run_time > now:
-                # Если время еще не наступило — планируем заново
-                scheduler.add_job(send_morning_message, "date", run_date=run_time, id="morning")
-                currentMorningToSend.update(state_of_morning_message["currentMorningToSend"])
+                # Нет сохраненного времени - планируем новое
+                await schedule_random_message(currentMessageToSend["ID"])
+        else:
+            # Нет сообщений в очереди - планируем новое для Саши
+            await schedule_random_message(SASHA_ID)
+        
+        # Восстанавливаем утренние сообщения
+        if currentMorningToSend and currentMorningToSend.get("ID"):
+            state_morning = await load_state(STATE_FOR_MORNING_FILE)
+            if state_morning and "next_message_time" in state_morning:
+                run_time = datetime.fromisoformat(state_morning["next_message_time"])
+                if run_time > now:
+                    # Время еще не наступило - перепланируем
+                    scheduler.add_job(send_morning_message, "date", run_date=run_time, id="morning")
+                    print(f"♻️ Восстановлено утреннее сообщение на {run_time}", flush=True)
+                    await bot.send_message(LOGS_ID, text=f"♻️ Восстановлено утреннее сообщение на {run_time}")
+                else:
+                    # Время прошло - отправляем сразу
+                    print("⏰ Время утреннего сообщения прошло, отправляем сейчас...", flush=True)
+                    await bot.send_message(LOGS_ID, text="⏰ Время утреннего сообщения прошло, отправляем сейчас...")
+                    asyncio.create_task(send_morning_message())
             else:
-                # Если время прошло — сразу отправляем
-                currentMorningToSend.update(state["currentMorningToSend"])
-                await send_morning_message()
-            print(f"♻️ Восстановлено запланированное сообщение на {run_time}", flush=True)
-            await bot.send_message(LOGS_ID, text=f"♻️ Восстановлено запланированное сообщение на {run_time}")
-        except Exception as e:
-            print(f"⚠️ Ошибка при восстановлении очереди сообщений: {e}", flush=True)
-            await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при восстановлении очереди сообщений: {e}")
-    # 3) запускаем polling (aiogram)
-    # Удаляем webhook на всякий случай, чтобы не конфликтовал
+                # Нет сохраненного времени - планируем новое
+                await schedule_random_morning_message(currentMorningToSend["ID"])
+        else:
+            # Нет утренних сообщений в очереди - планируем новое для Саши
+            await schedule_random_morning_message(SASHA_ID)
+        
+        # Добавляем ежедневную проверку праздников
+        if not scheduler.get_job("daily_special_check"):
+            scheduler.add_job(
+                check_and_send_special_day, 
+                "cron", 
+                hour=0, minute=0, 
+                timezone=pytz.timezone("Europe/Moscow"), 
+                id="daily_special_check"
+            )
+            print("✅ Добавлена ежедневная проверка праздников", flush=True)
+    
+    # 7) Запускаем планировщик
+    if not scheduler.running:
+        scheduler.start()
+        print("✅ Планировщик запущен", flush=True)
+        await bot.send_message(LOGS_ID, text="✅ Планировщик запущен")
+    
+    # 8) Сохраняем начальное состояние
+    await save_message_queue()
+    await save_scheduler_state()
+    
+    # 9) Запускаем бота
     await bot.delete_webhook(drop_pending_updates=True)
     print("🚀 Start polling...", flush=True)
-    await bot.send_message(LOGS_ID, text="🚀 Start polling...")
-    await dp.start_polling(bot)
+    await bot.send_message(LOGS_ID, text="🚀 Бот запущен с восстановлением состояния")
+    
+    try:
+        await dp.start_polling(bot)
+    except Exception as e:
+        print(f"❌ Ошибка в основном цикле: {e}", flush=True)
+        # Сохраняем состояние при ошибке
+        await save_message_queue()
+        await save_scheduler_state()
+        await bot.send_message(LOGS_ID, text=f"❌ Критическая ошибка: {e}")
+        raise
 
 
 if __name__ == "__main__":
