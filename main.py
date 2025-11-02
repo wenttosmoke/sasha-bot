@@ -338,7 +338,7 @@ async def start_cmd(message: types.Message):
         await bot.send_message(LOGS_ID, text=f"✅ Пользователь с ID {message.from_user.id} запустил бота ✅")
         await schedule_random_message(int(message.from_user.id))
         await schedule_random_morning_message(int(message.from_user.id))
-        scheduler.add_job(check_and_send_special_day, "cron", hour=0, minute=0, timezone=pytz.timezone("Europe/Moscow"), id="daily_special_check")
+        scheduler.add_job(check_and_send_special_day, "cron", hour=12, minute=40, timezone=pytz.timezone("Europe/Moscow"), id="daily_special_check")
     else:
         await bot.send_message(LOGS_ID, text=f"❌ Пользователь с ID {message.from_user.id} попытался запустить бота ❌")
         await message.answer("ты кто, съебался нахуй, бот не для тебя😡")
