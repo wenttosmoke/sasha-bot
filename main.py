@@ -84,13 +84,17 @@ def sync_save_scheduler_state():
     for job in scheduler.get_jobs():
         job_info = {
             'id': job.id,
-            'func': job.func.__name__ if hasattr(job.func, '__name__') else str(job.func),
-            'trigger_type': str(job.trigger)
+            'name': job.name if hasattr(job, 'name') else job.id,
+            'func': job.func.__name__ if hasattr(job.func, '__name__') else str(job.func)
         }
         
-        if job.next_run_time:
-            job_info['next_run_time'] = job.next_run_time.isoformat()
-        else:
+        # Безопасная проверка next_run_time
+        try:
+            if hasattr(job, 'next_run_time') and job.next_run_time is not None:
+                job_info['next_run_time'] = job.next_run_time.isoformat()
+            else:
+                job_info['next_run_time'] = None
+        except (AttributeError, Exception):
             job_info['next_run_time'] = None
             
         jobs_data.append(job_info)
@@ -122,18 +126,22 @@ async def load_state(file) -> dict:
 # === Функция сохранения состояния планировщика ===
 
 async def save_scheduler_state():
-    """Асинхронное сохранение состояния планировщика"""
+    """Сохраняет состояние планировщика"""
     jobs_data = []
     for job in scheduler.get_jobs():
         job_info = {
             'id': job.id,
-            'func': job.func.__name__ if hasattr(job.func, '__name__') else str(job.func),
-            'trigger_type': str(job.trigger)
+            'name': job.name if hasattr(job, 'name') else job.id,
+            'func': job.func.__name__ if hasattr(job.func, '__name__') else str(job.func)
         }
         
-        if job.next_run_time:
-            job_info['next_run_time'] = job.next_run_time.isoformat()
-        else:
+        # Безопасная проверка next_run_time
+        try:
+            if hasattr(job, 'next_run_time') and job.next_run_time is not None:
+                job_info['next_run_time'] = job.next_run_time.isoformat()
+            else:
+                job_info['next_run_time'] = None
+        except (AttributeError, Exception):
             job_info['next_run_time'] = None
             
         jobs_data.append(job_info)
@@ -146,12 +154,15 @@ async def restore_scheduler_state():
     """Восстанавливает состояние планировщика"""
     state = await load_state(SCHEDULER_STATE_FILE)
     if not state or 'jobs' not in state:
+        print("ℹ️ Нет сохраненного состояния планировщика", flush=True)
         return
     
     now = datetime.now(pytz.timezone("Europe/Moscow"))
+    restored_count = 0
     
     for job_data in state['jobs']:
         try:
+            # Пропускаем задачи без времени выполнения
             if not job_data.get('next_run_time'):
                 continue
                 
@@ -159,38 +170,49 @@ async def restore_scheduler_state():
             
             # Если время уже прошло, пропускаем
             if run_time <= now:
+                print(f"⏰ Время задачи {job_data.get('id')} уже прошло, пропускаем", flush=True)
                 continue
                 
-            if job_data['id'] == "random":
-                scheduler.add_job(
-                    send_random_message, 
-                    "date", 
-                    run_date=run_time, 
-                    id="random"
-                )
-                print(f"♻️ Восстановлена задача random на {run_time}", flush=True)
-                
-            elif job_data['id'] == "morning":
-                scheduler.add_job(
-                    send_morning_message, 
-                    "date", 
-                    run_date=run_time, 
-                    id="morning"
-                )
-                print(f"♻️ Восстановлена задача morning на {run_time}", flush=True)
-                
-            elif job_data['id'] == "daily_special_check":
-                # Для cron задач просто пересоздаем
-                scheduler.add_job(
-                    check_and_send_special_day, 
-                    "cron", 
-                    hour=0, minute=0, 
-                    timezone=pytz.timezone("Europe/Moscow"), 
-                    id="daily_special_check"
-                )
+            # Восстанавливаем задачи по их ID
+            job_id = job_data.get('id')
+            if job_id == "random":
+                if not scheduler.get_job("random"):
+                    scheduler.add_job(
+                        send_random_message, 
+                        "date", 
+                        run_date=run_time, 
+                        id="random"
+                    )
+                    restored_count += 1
+                    print(f"♻️ Восстановлена задача random на {run_time}", flush=True)
+                    
+            elif job_id == "morning":
+                if not scheduler.get_job("morning"):
+                    scheduler.add_job(
+                        send_morning_message, 
+                        "date", 
+                        run_date=run_time, 
+                        id="morning"
+                    )
+                    restored_count += 1
+                    print(f"♻️ Восстановлена задача morning на {run_time}", flush=True)
+                    
+            elif job_id == "daily_special_check":
+                if not scheduler.get_job("daily_special_check"):
+                    scheduler.add_job(
+                        check_and_send_special_day, 
+                        "cron", 
+                        hour=0, minute=0, 
+                        timezone=pytz.timezone("Europe/Moscow"), 
+                        id="daily_special_check"
+                    )
+                    restored_count += 1
+                    print(f"♻️ Восстановлена задача daily_special_check", flush=True)
                 
         except Exception as e:
             print(f"⚠️ Ошибка при восстановлении задачи {job_data.get('id')}: {e}", flush=True)
+    
+    print(f"✅ Восстановлено {restored_count} задач планировщика", flush=True)
 
 # === Функция сохранения очереди сообщений ===
 
@@ -394,29 +416,31 @@ async def send_morning_message():
 # === Функция случайного времени сообщения ===
 
 async def schedule_random_message(ID):
+    """Планирует отправку с сохранением состояния"""
     try:
-        """Планирует отправку в случайную дату/время"""
-        if scheduler.get_jobs("random"):
-            scheduler.remove_job("random")  # очищаем прошлое задание
-    
+        # Удаляем старую задачу если есть
+        old_job = scheduler.get_job("random")
+        if old_job:
+            old_job.remove()
+ 
         # Случайное время — от 1 часа до 2 дней вперёд
         deltaforMessages = timedelta(
             days=0,
             hours=0,
             minutes=5
-            # days=random.randint(0, 7),
-            # hours=random.randint(0, 23),
-            # minutes=random.randint(0, 59)
         )
 
         run_time = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMessages
+        
+        # Выбираем сообщение (ваш существующий код)
         message = random.choice(list(sendToSasha.keys()))
         while (message != "withSong" and len(sendToSasha[message]["texts"]) == 0) or (message == "withSong" and len(sendToSasha[message]["songs"]) == 0):
-                print(f"⚠️ Закончились строки {sendToSasha[message]}", flush=True)
-                await bot.send_message(LOGS_ID, text=f"⚠️ Закончились строки {message}")
-                del sendToSasha[message]
-                message = random.choice(list(sendToSasha.keys()))
+            print(f"⚠️ Закончились строки {sendToSasha[message]}", flush=True)
+            await bot.send_message(LOGS_ID, text=f"⚠️ Закончились строки {message}")
+            del sendToSasha[message]
+            message = random.choice(list(sendToSasha.keys()))
 
+        # Подготавливаем сообщение (ваш существующий код)
         if message == "withSong":
             try:
                 print(f"Сообщение будет отправлено с песней.", flush=True)
@@ -445,32 +469,36 @@ async def schedule_random_message(ID):
                     print(f"⚠️ Ошибка при выборе стикера: {e}", flush=True)
                     await bot.send_message(LOGS_ID, text=f"⚠️ Ошибка при выборе стикера: {e}")
             currentMessageToSend["text"] = text
+        
         currentMessageToSend["ID"] = ID
-        await bot.send_message(LOGS_ID, text=f"❕\tСледующее сообщение:\t❕\nТекст: {currentMessageToSend["text"]}\nФото: {currentMessageToSend["photo"] if "photo" in currentMessageToSend else ""}\nСтикер: {currentMessageToSend["sticker"] if "" in currentMessageToSend else ""}\nПесня: {currentMessageToSend["song"] if "song" in currentMessageToSend else ""}")
+        
+        # Добавляем задачу в планировщик
         scheduler.add_job(send_random_message, "date", run_date=run_time, id="random")
-        await save_state({
-            "next_message_time": run_time.isoformat(),
-            "currentMessageToSend": currentMessageToSend
-        }, STATE_FILE)
-        print(f"❕ Следующее сообщение успешно запланировано на {run_time} ❕", flush=True)
-        await bot.send_message(LOGS_ID, text=f"❕ Следующее сообщение успешно запланировано на {run_time} ❕")
-     # Сохраняем очередь и планировщика  
+        
+        # Сохраняем состояние
         await save_message_queue()
         await save_scheduler_state()
+        
+        print(f"❕ Следующее сообщение успешно запланировано на {run_time} ❕", flush=True)
+        await bot.send_message(LOGS_ID, text=f"❕ Следующее сообщение успешно запланировано на {run_time} ❕")
+        
     except Exception as e:
         print(f"❌ Ошибка при планировании сообщения: {e}", flush=True)
-        await bot.send_message(LOGS_ID, text=f"❌ Ошибка при планировании сообщения: {e}")   
-       
+        await bot.send_message(LOGS_ID, text=f"❌ Ошибка при планировании сообщения: {e}")
+
 # === Функция случайного времени утреннего сообщения ===
 
 async def schedule_random_morning_message(ID):
+    """Планирует утреннюю отправку с сохранением состояния"""
     try:
-        """Планирует отправку в случайную дату/время"""
-        if scheduler.get_jobs("morning"):
-            scheduler.remove_job("morning")  # очищаем прошлое задание
-    
+        # Удаляем старую задачу если есть
+        old_job = scheduler.get_job("morning")
+        if old_job:
+            old_job.remove()
+ 
         # Случайное время — от 8 утра до 12 следующего дня
         deltaTuple = get_time_delta()[0]
+        print(f"deltaTuple={deltaTuple}", flush=True)
         deltaforMorningTexts = timedelta(
             days=int(deltaTuple[0]),
             hours=int(deltaTuple[1]),
@@ -478,28 +506,29 @@ async def schedule_random_morning_message(ID):
         )
         run_time_for_morning_texts = datetime.now(pytz.timezone("Europe/Moscow")) + deltaforMorningTexts
         
+        # Подготавливаем утреннее сообщение
         text = random.choice(morningTexts)
         morningTexts.remove(text)
         choosedsticker = random.choice(stickerForMorning)
+        
         currentMorningToSend["text"] = text
         currentMorningToSend["ID"] = ID
         currentMorningToSend["sticker"] = choosedsticker
 
-        await bot.send_message(LOGS_ID, text=f"❕\tСледующее утреннее сообщение:\t❕\nТекст: {currentMorningToSend["text"]}\nСтикер: {currentMorningToSend["sticker"]}")
+        # Добавляем задачу в планировщик
         scheduler.add_job(send_morning_message, "date", run_date=run_time_for_morning_texts, id="morning")
-        await save_state({
-            "next_message_time": run_time_for_morning_texts.isoformat(),
-            "currentMessageToSend": currentMorningToSend
-        }, STATE_FOR_MORNING_FILE)
-        print(f"❕ Следующее утреннее сообщение успешно запланировано на {run_time_for_morning_texts} ❕", flush=True)
-        await bot.send_message(LOGS_ID, text=f"❕ Следующее утреннее сообщение успешно запланировано на {run_time_for_morning_texts} ❕")
-    # Сохраняем очередь и планировщика  
+        
+        # Сохраняем состояние
         await save_message_queue()
         await save_scheduler_state()
+        
+        print(f"❕ Следующее утреннее сообщение успешно запланировано на {run_time_for_morning_texts} ❕", flush=True)
+        await bot.send_message(LOGS_ID, text=f"❕ Следующее утреннее сообщение успешно запланировано на {run_time_for_morning_texts} ❕")
+        
     except Exception as e:
         print(f"❌ Ошибка при планировании утреннего сообщения: {e}", flush=True)
-        await bot.send_message(LOGS_ID, text=f"❌ Ошибка при планировании утреннего сообщения: {e}")   
-       
+        await bot.send_message(LOGS_ID, text=f"❌ Ошибка при планировании утреннего сообщения: {e}")
+
 # === Обработчики команд и сообщений ===
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
@@ -659,30 +688,30 @@ async def main():
         scheduler.start()
         print("✅ Планировщик запущен", flush=True)
     
-    # 7) Восстанавливаем задачи планировщика
+     # 7) Восстанавливаем задачи планировщика
     await restore_scheduler_state()
     
-    # 8) Если нет активных задач, создаем новые
-    if not scheduler.get_job("random"):
+    # 8) Проверяем и создаем задачи если нужно
+    now = datetime.now(pytz.timezone("Europe/Moscow"))
+    
+    # Проверяем задачу random
+    random_job = scheduler.get_job("random")
+    if not random_job:
         print("🔄 Создание новой задачи random...", flush=True)
         target_id = currentMessageToSend.get("ID", SASHA_ID)
         await schedule_random_message(target_id)
+    else:
+        print(f"✅ Задача random активна, следующее выполнение: {random_job.next_run_time}", flush=True)
     
-    if not scheduler.get_job("morning"):
+    # Проверяем задачу morning  
+    morning_job = scheduler.get_job("morning")
+    if not morning_job:
         print("🔄 Создание новой задачи morning...", flush=True)
         target_id = currentMorningToSend.get("ID", SASHA_ID)
         await schedule_random_morning_message(target_id)
-    
-    if not scheduler.get_job("daily_special_check"):
-        scheduler.add_job(
-            check_and_send_special_day, 
-            "cron", 
-            hour=0, minute=0, 
-            timezone=pytz.timezone("Europe/Moscow"), 
-            id="daily_special_check"
-        )
-        print("✅ Добавлена ежедневная проверка праздников", flush=True)
-    
+    else:
+        print(f"✅ Задача morning активна, следующее выполнение: {morning_job.next_run_time}", flush=True)
+        
     # 9) Сохраняем начальное состояние
     await save_message_queue()
     await save_scheduler_state()
