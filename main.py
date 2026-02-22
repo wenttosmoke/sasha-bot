@@ -92,7 +92,7 @@ async def check_and_send_special_day():
 
     if (month, day) in special_days:
         text = special_days[(month, day)]
-        await bot.send_message(MY_ID, text=text)
+        await bot.send_message(SASHA_ID, text=text)
         await bot.send_message(GROUP_ID, text=text)
         await bot.send_message(LOGS_ID, text=f"🎉 Отправлено праздничное сообщение за {now.strftime('%d.%m.%Y')}:\n{text}")
     else:
