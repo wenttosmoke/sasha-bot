@@ -334,7 +334,7 @@ async def start_cmd(message: types.Message):
     if int(message.from_user.id) == MY_ID or int(message.from_user.id) == SASHA_ID:
         scheduler.start()
 
-        await message.answer("мяу мяу, ты вернулась! солнце, пару месяцев, и я буду с тобой и уже не уйду. бот сделан с любовью и костылями. наслаждайся. люблю тебя!")
+        await message.answer("мяу мяу, ты вернулась! солнце, пару месяцев, и я буду с тобой и уже не уйду. бот сделан с любовью и костылями. наслаждайся. скучаю 24 часа, 1440 минут, 86400 секунд в сутки.\nлюблю тебя, блин, очень-очень!")
         await bot.send_message(LOGS_ID, text=f"✅ Пользователь с ID {message.from_user.id} запустил бота ✅")
         await schedule_random_message(int(message.from_user.id))
         await schedule_random_morning_message(int(message.from_user.id))
@@ -351,7 +351,7 @@ async def start_cmd(message: types.Message):
 async def echo_msg(message: types.Message):
     if int(message.from_user.id) == MY_ID or int(message.from_user.id) == SASHA_ID:
         if message.chat.id == message.from_user.id:
-            await message.reply("я в армии, смотрю на небо в поисках твои глаз\nя их найду даже самой тёмной ночью\nосталось немного, котик, дождись...")
+            await message.reply("я в армии, смотрю на небо в поисках твоих глаз\nя их найду даже самой тёмной ночью.\nосталось немного, котик, дождись...")
             await bot.send_message(GROUP_ID, text="❗❗❗ Она ответила ❗❗❗")
             await bot.forward_message(
                 chat_id=GROUP_ID,          
